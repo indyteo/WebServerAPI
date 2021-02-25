@@ -6,626 +6,557 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Paths;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.sun.net.httpserver.Headers;
 
+import com.sun.net.httpserver.HttpExchange;
 import fr.theoszanto.webserver.WebServer;
+import fr.theoszanto.webserver.handler.Handler;
+import fr.theoszanto.webserver.utils.Checks;
+import fr.theoszanto.webserver.utils.MiscUtils;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The object representing the server response.
- * 
- * <p>This class is a singleton and should be initialized
- * before handling each exchange, and close after.
- * 
+ *
  * @author	indyteo
- * @see		HttpResponse#getInstance()
- * @see		HttpResponse#init()
- * @see		HttpResponse#close()
  */
 public final class HttpResponse {
+	/**
+	 * System logger for HttpRequest class.
+	 */
+	private static final @NotNull Logger LOGGER = Logger.getLogger(HttpResponse.class.getName());
+
+	/**
+	 * The server containing useful data such as the root or the router.
+	 *
+	 * @see		WebServer
+	 */
+	private final @NotNull WebServer server;
+
+	/**
+	 * The exchange containing client request data and server response
+	 * methods.
+	 *
+	 * @see		HttpExchange
+	 */
+	private final @NotNull HttpExchange exchange;
+
 	/**
 	 * The response that will be send to the client before
 	 * ending handling with {@link HttpResponse#end()}.
 	 */
-	private String response;
-	
+	private final @NotNull StringBuilder response = new StringBuilder();
+
 	/**
-	 * The status to be send if {@link HttpResponse#end()} is
-	 * called without specifying one.
+	 * The status to be send when calling {@link HttpResponse#end()}
 	 */
-	private HttpStatus status;
-	
+	private @Nullable HttpStatus status;
+
 	/**
-	 * Check whether or not the method {@link HttpResponse#end()}
+	 * Check whether or not a terminal operation
 	 * have been called for this exchange.
 	 * 
 	 * <p>If this field is {@code false} when the Handle
 	 * terminate, the {@link Handler super-handler} will send
-	 * a default {@link HttpStatus#NOT_FOUND 404 Not Found}.
+	 * a default {@link HttpStatus#NOT_FOUND 404 Not Found}.</p>
 	 */
-	private boolean statusSent;
+	private boolean terminated;
 
 	/**
-	 * Check whether or not the {@link HttpResponse#init()}
-	 * method have been called for this exchange.
-	 * 
-	 * <p>The {@link HttpResponse#close()} method reset this
-	 * value to {@code false}.
-	 * 
-	 * @see		HttpResponse#init()
-	 * @see		HttpResponse#close()
+	 * Construct a new response from the server.
+	 *
+	 * @param server
+	 * 			The WebServer to bind this response to.
+	 * @param exchange
+	 * 			The exchange of the response.
 	 */
-	private boolean isInit;
-	
-	/**
-	 * The unique instance of this class.
-	 * 
-	 * @see		HttpResponse#getInstance()
-	 */
-	private static HttpResponse instance;
-	
-	/**
-	 * Private constructor to prevent other instanciation.
-	 */
-	private HttpResponse() {
-		this.init();
-	}
-	
-	/**
-	 * Return the unique instance of this singleton class.
-	 * 
-	 * <p>The first call to this method will create the instance.
-	 * 
-	 * @return	The instance of the class.
-	 */
-	public static HttpResponse getInstance() {
-		if (instance == null)
-			instance = new HttpResponse();
-		
-		return instance;
+	public HttpResponse(@NotNull WebServer server, @NotNull HttpExchange exchange) {
+		Checks.notNull(server, "server");
+		Checks.notNull(exchange, "exchange");
+		this.server = server;
+		this.exchange = exchange;
+		this.header("Content-type", HttpMIMEType.HTML.getMime());
 	}
 
-	/**
-	 * Launch the init process with the current HttpExchange
-	 * static field of the {@link Handler super-handler}.
-	 * 
-	 * <p>This should normally be call once by exchange.
-	 */
-	void init() {
-		if (this.isInit)
-			return;
-		
-		this.response = "";
-		this.status = null;
-		this.statusSent = false;
-		
-		this.isInit = true;
-	}
-	
 	/**
 	 * Return the response headers, used to give informations
 	 * about our response.
 	 * 
 	 * @return	The response {@link Headers headers}
 	 */
-	public Headers getHeaders() {
-		return Handler.getExchange().getResponseHeaders();
+	@Contract(pure = true)
+	public @NotNull Headers getHeaders() {
+		return exchange.getResponseHeaders();
 	}
-	
+
 	/**
-	 * End this exchange with a {@link HttpStatus#NOT_FOUND 404 Not Found}
-	 * error code.
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 */
-	public void send404() throws IOException {
-		this.end(HttpStatus.NOT_FOUND);
-	}
-	
-	/**
-	 * Add the response to a buffer until the method
-	 * {@link HttpResponse#end()} is call.
-	 * 
-	 * @param response
-	 * 			The character to be buffered.
+	 * Set the current header to the given value(s).
+	 *
+	 * @param name
+	 * 			The name of the header to set.
+	 * @param value
+	 * 			The first value to set the header to.
+	 * @param moreValues
+	 *			Other values to add to the header.
 	 * @return	Itself, to allow chained calls.
-	 * @see		HttpResponse#send(String)
+	 * @see		HttpResponse#getHeaders()
 	 */
-	public HttpResponse send(char response) {
-		return this.send(Character.toString(response));
-	}
-	
-	/**
-	 * Add the response to a buffer until the method
-	 * {@link HttpResponse#end()} is call.
-	 * 
-	 * @param response
-	 * 			The String to be buffered.
-	 * @return	Itself, to allow chained calls.
-	 */
-	public HttpResponse send(String response) {
-		this.response += response;
+	@Contract(value = "_, _, _ -> this", mutates = "this")
+	public @NotNull HttpResponse header(@NotNull String name, @NotNull String value, @NotNull String... moreValues) {
+		Checks.notEmpty(name, "name");
+		Checks.notEmpty(value, "value");
+		Checks.notNull(moreValues, "moreValues");
+		Headers headers = this.getHeaders();
+		headers.set(name, value);
+		for (String moreValue : moreValues)
+			headers.add(name, moreValue);
 		return this;
 	}
-	
+
 	/**
-	 * Define the HttpStatus to be send if not specified
-	 * when calling {@link HttpResponse#end()}.
+	 * Add the response to a buffer until the method
+	 * {@link HttpResponse#end()} is call.
+	 *
+	 * <p>If {@code response} is not {@code null},
+	 * calls {@code response.toString()} to
+	 * transform the element into a string value.
+	 * Otherwise, {@code null} is not displayed.</p>
+	 *
+	 * @param response
+	 * 			The element to be buffered.
+	 * @return	Itself, to allow chained calls.
+	 * @see		HttpResponse#sendEscaped(Object)
+	 */
+	@Contract(value = "_ -> this", mutates = "this")
+	public @NotNull HttpResponse send(@Nullable Object response) {
+		if (response != null)
+			this.response.append(response.toString());
+		return this;
+	}
+
+	/**
+	 * Escape HTML characters of the response and add it to
+	 * a buffer until the method {@link HttpResponse#end()}
+	 * is call.
+	 *
+	 * <p>If {@code response} is not {@code null},
+	 * calls {@code response.toString()} to
+	 * transform the element into a string value.
+	 * Otherwise, {@code null} is not displayed.</p>
+	 *
+	 * @param response
+	 * 			The element to be escaped then buffered.
+	 * @return	Itself, to allow chained calls.
+	 * @see		HttpResponse#send(Object)
+	 */
+	@Contract(value = "_ -> this", mutates = "this")
+	public @NotNull HttpResponse sendEscaped(@Nullable Object response) {
+		if (response != null)
+			this.response.append(MiscUtils.escapeHTML(response.toString()));
+		return this;
+	}
+
+	/**
+	 * Define the HttpStatus to be send when
+	 * calling {@link HttpResponse#end()}.
 	 * 
 	 * @param status
 	 * 			The new HttpStatus.
 	 * @return	Itself, to allow chained calls.
-	 * @see		HttpResponse#getCurrentStatus()
+	 * @see		HttpResponse#getStatus()
 	 */
-	public HttpResponse setStatus(HttpStatus status) {
+	@Contract(value = "_ -> this", mutates = "this")
+	public @NotNull HttpResponse setStatus(@Nullable HttpStatus status) {
 		this.status = status;
 		return this;
 	}
-	
+
 	/**
 	 * Return the actual defined status.
 	 * 
 	 * @return	The status, if defined, {@code null} otherwise.
 	 * @see		HttpResponse#setStatus(HttpStatus)
 	 */
-	public HttpStatus getCurrentStatus() {
+	@Contract(pure = true)
+	public @Nullable HttpStatus getStatus() {
 		return this.status;
 	}
-	
+
 	/**
-	 * End the handling by sending the file located at path.
-	 * 
-	 * <p>A {@link HttpStatus#NOT_FOUND 404 Not Found} error
-	 * code will be send if the file does not exists.
-	 * 
-	 * <p>A default {@link HttpStatus#OK 200 OK} status code
-	 * is send.
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param path
-	 * 			The location of the file to send. It must be
-	 * 			relative to the {@link WebServer#getRoot() Web server root}.
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 * @see		HttpResponse#sendFile(File)
-	 * @see		HttpResponse#sendFile(String, boolean)
+	 * Define the {@code Content-type} response header.
+	 *
+	 * @param type
+	 * 			The content type to set.
+	 * @return	Itself, to allow chained calls.
+	 * @see		HttpResponse#getHeaders()
 	 */
-	public void sendFile(String path) throws IOException {
-		this.sendFile(path, false);
+	@Contract(value = "_ -> this", mutates = "this")
+	public @NotNull HttpResponse contentType(@NotNull HttpMIMEType type) {
+		return this.header("Content-type", type.getMime());
 	}
-	
+
 	/**
-	 * End the handling by sending the file located at path.
-	 * 
+	 * End the handling by sending the specified file.
+	 *
 	 * <p>A {@link HttpStatus#NOT_FOUND 404 Not Found} error
-	 * code will be send if the file does not exists.
-	 * 
+	 * code will be send if the file does not exists.</p>
+	 *
 	 * <p>If set, the {@link HttpResponse#status actual status}
 	 * will be send, otherwise a default {@link HttpStatus#OK 200 OK}
-	 * status code is send.
-	 * 
+	 * status code is send.</p>
+	 *
 	 * <p>If the download parameter is set to {@code true}, the
-	 * file with be suggested as download for the client, instead
-	 * of displaying it, if possible (such as text files).
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param path
-	 * 			The location of the file to send. It must be
-	 * 			relative to the {@link WebServer#getRoot() Web server root}.
-	 * @param download
-	 * 			Whether or not the file should be downloaded by
-	 * 			the client.
+	 * file will be suggested as download for the client, instead
+	 * of displaying it, if possible (such as text files).</p>
+	 *
+	 * <p>This is a terminal operation.</p>
+	 *
+	 * @param fileResponse
+	 * 			The file response object containing information
+	 * 			about file to send.
 	 * @throws IOException
 	 * 			If an I/O exception occurs, for example, if the
 	 * 			response was already send.
-	 * @see		HttpResponse#sendFile(File, boolean)
-	 * @see		HttpResponse#sendFile(HttpStatus, String, boolean)
+	 * @see		HttpResponse.FileResponse
 	 */
-	public void sendFile(String path, boolean download) throws IOException {
-		HttpStatus status = this.status;
-		if (status == null)
-			status = HttpStatus.OK;
-		this.sendFile(status, path, download);
-	}
-	
-	/**
-	 * End the handling by sending the file located at path.
-	 * 
-	 * <p>A {@link HttpStatus#NOT_FOUND 404 Not Found} error
-	 * code will be send if the file does not exists.
-	 * 
-	 * <p>The status specified will be send with the file.
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param status
-	 * 			The {@link HttpStatus} to be send with the file.
-	 * @param path
-	 * 			The location of the file to send. It must be
-	 * 			relative to the {@link WebServer#getRoot() Web server root}.
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 * @see		HttpResponse#sendFile(HttpStatus, File)
-	 * @see		HttpResponse#sendFile(HttpStatus, String, boolean)
-	 */
-	public void sendFile(HttpStatus status, String path) throws IOException {
-		this.sendFile(status, path, false);
-	}
-	
-	/**
-	 * End the handling by sending the file located at path.
-	 * 
-	 * <p>A {@link HttpStatus#NOT_FOUND 404 Not Found} error
-	 * code will be send if the file does not exists.
-	 * 
-	 * <p>The status specified will be send with the file.
-	 * 
-	 * <p>If the download parameter is set to {@code true}, the
-	 * file with be suggested as download for the client, instead
-	 * of displaying it, if possible (such as text files).
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param status
-	 * 			The {@link HttpStatus} to be send with the file.
-	 * @param path
-	 * 			The location of the file to send. It must be
-	 * 			relative to the {@link WebServer#getRoot() Web server root}.
-	 * @param download
-	 * 			Whether or not the file should be downloaded by
-	 * 			the client.
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 * @see		HttpResponse#sendFile(HttpStatus, File, boolean)
-	 */
-	public void sendFile(HttpStatus status, String path, boolean download) throws IOException {
-		this.sendFile(status, new File(Paths.get(Handler.getServer().getRoot(), path).toString()), download);
-	}
-	
-	/**
-	 * End the handling by sending the specified file.
-	 * 
-	 * <p>A {@link HttpStatus#NOT_FOUND 404 Not Found} error
-	 * code will be send if the file does not exists.
-	 * 
-	 * <p>A default {@link HttpStatus#OK 200 OK} status code
-	 * is send.
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param file
-	 * 			The file to be send.
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 * @see		HttpResponse#sendFile(String)
-	 * @see		HttpResponse#sendFile(File, boolean)
-	 */
-	public void sendFile(File file) throws IOException {
-		this.sendFile(file, false);
-	}
-	
-	/**
-	 * End the handling by sending the specified file.
-	 * 
-	 * <p>A {@link HttpStatus#NOT_FOUND 404 Not Found} error
-	 * code will be send if the file does not exists.
-	 * 
-	 * <p>If set, the {@link HttpResponse#status actual status}
-	 * will be send, otherwise a default {@link HttpStatus#OK 200 OK}
-	 * status code is send.
-	 * 
-	 * <p>If the download parameter is set to {@code true}, the
-	 * file with be suggested as download for the client, instead
-	 * of displaying it, if possible (such as text files).
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param file
-	 * 			The file to be send.
-	 * @param download
-	 * 			Whether or not the file should be downloaded by
-	 * 			the client.
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 * @see		HttpResponse#sendFile(String, boolean)
-	 * @see		HttpResponse#sendFile(HttpStatus, File, boolean)
-	 */
-	public void sendFile(File file, boolean download) throws IOException {
-		HttpStatus status = this.status;
-		if (status == null)
-			status = HttpStatus.OK;
-		this.sendFile(status, file, download);
-	}
-	
-	/**
-	 * End the handling by sending the specified file.
-	 * 
-	 * <p>A {@link HttpStatus#NOT_FOUND 404 Not Found} error
-	 * code will be send if the file does not exists.
-	 * 
-	 * <p>The status specified will be send with the file.
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param status
-	 * 			The {@link HttpStatus} to be send with the file.
-	 * @param file
-	 * 			The file to be send.
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 * @see		HttpResponse#sendFile(HttpStatus, String)
-	 * @see		HttpResponse#sendFile(HttpStatus, File, boolean)
-	 */
-	public void sendFile(HttpStatus status, File file) throws IOException {
-		this.sendFile(status, file, false);
-	}
-	
-	/**
-	 * End the handling by sending the specified file.
-	 * 
-	 * <p>A {@link HttpStatus#NOT_FOUND 404 Not Found} error
-	 * code will be send if the file does not exists.
-	 * 
-	 * <p>The status specified will be send with the file.
-	 * 
-	 * <p>If the download parameter is set to {@code true}, the
-	 * file with be suggested as download for the client, instead
-	 * of displaying it, if possible (such as text files).
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param status
-	 * 			The {@link HttpStatus} to be send with the file.
-	 * @param file
-	 * 			The file to be send.
-	 * @param download
-	 * 			Whether or not the file should be downloaded by
-	 * 			the client.
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 * @see		HttpResponse#sendFile(HttpStatus, String, boolean)
-	 */
-	public void sendFile(HttpStatus status, File file, boolean download) throws IOException {
-		String mime = HttpMIMEType.getMime(file);
-		if (mime == null)
-			mime = HttpMIMEType.DEFAULT.getMime();
-		this.getHeaders().add("Content-Type", mime);
-		
-		if (download)
-			this.getHeaders().add("Content-Disposition", "attachment; filename=\"" + file.getName() + "\"");
+	public void sendFile(@NotNull FileResponse fileResponse) throws IOException {
+		Checks.notNull(fileResponse, "file");
+
+		// Verify the file exists
+		if (!fileResponse.file.exists() || !fileResponse.file.isFile()) {
+			this.setStatus(HttpStatus.NOT_FOUND).end();
+			return;
+		}
+
+		// Ensure a valid status is set
+		if (this.status == null)
+			this.status = HttpStatus.OK;
+
+		// Retrieve the MIME type and deny access if unknown extension
+		HttpMIMEType mime = MiscUtils.ifNullGet(fileResponse.type, () -> HttpMIMEType.fromExtension(fileResponse.file));
+		if (mime == null) {
+			if (fileResponse.unsafe)
+				mime = HttpMIMEType.DEFAULT;
+			else {
+				this.setStatus(HttpStatus.FORBIDDEN).end();
+				return;
+			}
+		}
+		// Then, set the Content-type header
+		this.contentType(mime);
+
+		// Add Content-disposition if needed to download
+		if (fileResponse.download)
+			this.header("Content-disposition", "attachment; filename=\"" + fileResponse.file.getName() + "\"");
+
 		try {
-			FileInputStream fs = new FileInputStream(file);
+			// Send file in response to client
+			this.exchange.sendResponseHeaders(this.status.getCode(), 0);
+			FileInputStream fs = new FileInputStream(fileResponse.file);
+			OutputStream responseBody = this.exchange.getResponseBody();
 			int byteRead;
-			Handler.getExchange().sendResponseHeaders(status.getCode(), 0);
-			OutputStream responseBody = Handler.getExchange().getResponseBody();
 			while ((byteRead = fs.read()) != -1)
-				responseBody.write((char) byteRead);
+				responseBody.write(byteRead);
 			responseBody.flush();
 			responseBody.close();
 			fs.close();
-			this.statusSent = true;
-		}
-		catch (FileNotFoundException e) {
-			this.getHeaders().set("Content-Type", HttpMIMEType.HTML.getMime());
-			this.send404();
+			this.terminated = true;
+		} catch (FileNotFoundException e) {
+			// Or a 404 Not Found error
+			this.setStatus(HttpStatus.NOT_FOUND).contentType(HttpMIMEType.HTML).end();
 		}
 	}
-	
+
+	/**
+	 * Represent a file as a response to client.
+	 *
+	 * @see		HttpResponse#sendFile(FileResponse)
+	 * @see		HttpResponse.FileResponseBuilder
+	 */
+	public static class FileResponse {
+		/**
+		 * The file to send to the client.
+		 */
+		private final @NotNull File file;
+		/**
+		 * Whether or not the file should be downloaded by
+		 * the client.
+		 */
+		private final boolean download;
+		/**
+		 * Whether to allow unsafe (unknown) file extensions
+		 * to be sent to the client or not.
+		 */
+		private final boolean unsafe;
+		/**
+		 * The MIME type to force. Otherwise, MIME is
+		 * {@link HttpMIMEType#fromExtension(File) retrieved from the extension}.
+		 */
+		private final @Nullable HttpMIMEType type;
+
+		/**
+		 * Create a new file response object.
+		 *
+		 * @param file
+		 * 			The file to send to the client.
+		 * @param download
+		 * 			Whether or not the file should be downloaded by
+		 * 			the client.
+		 * @param unsafe
+		 * 			Whether to allow unsafe (unknown) file extensions
+		 * 			to be sent to the client or not.
+		 * @param type
+		 * 			The MIME type to force. Otherwise, MIME is
+		 * 			{@link HttpMIMEType#fromExtension(File) retrieved from the extension}.
+		 * @see		HttpResponse.FileResponseBuilder
+		 */
+		public FileResponse(@NotNull File file, boolean download, boolean unsafe, @Nullable HttpMIMEType type) {
+			Checks.notNull(file, "file");
+			this.file = file;
+			this.download = download;
+			this.unsafe = unsafe;
+			this.type = type;
+		}
+	}
+
+	/**
+	 * Builder to create {@link FileResponse file response}
+	 */
+	public static class FileResponseBuilder {
+		/**
+		 * Response for which the file response will be created.
+		 */
+		private final @NotNull HttpResponse response;
+
+		/**
+		 * The file to send to the client.
+		 */
+		private @Nullable File file = null;
+		/**
+		 * Whether or not the file should be downloaded by
+		 * the client.
+		 */
+		private boolean download = false;
+		/**
+		 * Whether to allow unsafe (unknown) file extensions
+		 * to be sent to the client or not.
+		 */
+		private boolean unsafe = false;
+		/**
+		 * The MIME type to force. Otherwise, MIME is
+		 * {@link HttpMIMEType#fromExtension(File) retrieved from the extension}.
+		 */
+		private @Nullable HttpMIMEType type = null;
+
+		/**
+		 * Create a new builder bound to the given response.
+		 *
+		 * @param response
+		 * 			Response for which the file response
+		 * 			will be created.
+		 */
+		public FileResponseBuilder(@NotNull HttpResponse response) {
+			this.response = response;
+		}
+
+		/**
+		 * Create a new file response using the builder's
+		 * current properties.
+		 *
+		 * @return	A new file response from the current state.
+		 */
+		@Contract(value = " -> new", pure = true)
+		public @NotNull FileResponse build() {
+			Checks.notNull(this.file, "file");
+			return new FileResponse(this.file, this.download, this.unsafe, this.type);
+		}
+
+		/**
+		 * Set the file to send to the client.
+		 *
+		 * @param file
+		 * 			The file to send to the client.
+		 * @return	Itself, to allow chained calls.
+		 */
+		@Contract(value = "_ -> this", mutates = "this")
+		public @NotNull FileResponseBuilder setFile(@NotNull File file) {
+			Checks.notNull(file, "file");
+			this.file = file;
+			return this;
+		}
+
+		/**
+		 * Set the file to send to the client from the given
+		 * path.
+		 *
+		 * @param path
+		 * 			The path of the file to send to the client.
+		 * @return	Itself, to allow chained calls.
+		 */
+		@Contract(value = "_ -> this", mutates = "this")
+		public @NotNull FileResponseBuilder setFile(@NotNull String path) {
+			Checks.notNull(path, "path");
+			this.file = Paths.get(this.response.server.getRoot(), path).toFile();
+			return this;
+		}
+
+		/**
+		 * Set whether or not the file should be downloaded
+		 * by the client.
+		 *
+		 * @param download
+		 * 			Whether or not the file should be downloaded by
+		 * 			the client.
+		 * @return	Itself, to allow chained calls.
+		 */
+		@Contract(value = "_ -> this", mutates = "this")
+		public @NotNull FileResponseBuilder setDownload(boolean download) {
+			this.download = download;
+			return this;
+		}
+
+		/**
+		 * Set whether to allow unsafe (unknown) file extensions
+		 * to be sent to the client or not.
+		 *
+		 * @param unsafe
+		 * 			Whether to allow unsafe (unknown) file extensions
+		 * 			to be sent to the client or not.
+		 * @return	Itself, to allow chained calls.
+		 */
+		@Contract(value = "_ -> this", mutates = "this")
+		public @NotNull FileResponseBuilder setUnsafe(boolean unsafe) {
+			this.unsafe = unsafe;
+			return this;
+		}
+
+		/**
+		 * Set the MIME type to force. If not set, the MIME is
+		 * {@link HttpMIMEType#fromExtension(File) retrieved from the extension}.
+		 *
+		 * @param type
+		 * 			The MIME type to force.
+		 * @return	Itself, to allow chained calls.
+		 */
+		@Contract(value = "_ -> this", mutates = "this")
+		public @NotNull FileResponseBuilder setType(@Nullable HttpMIMEType type) {
+			this.type = type;
+			return this;
+		}
+	}
+
 	/**
 	 * End the handling by redirecting the client to location.
 	 * 
 	 * <p>If set, the {@link HttpResponse#status actual status}
 	 * will be send, otherwise a default {@link HttpStatus#FOUND 302 Found}
-	 * status code is send.
+	 * status code is send.</p>
 	 * 
-	 * <p>This is a terminal operation.
+	 * <p>This is a terminal operation.</p>
 	 * 
 	 * @param location
 	 * 			The location where the client should be redirected.
 	 * @throws IOException
 	 * 			If an I/O exception occurs, for example, if the
 	 * 			response was already send.
-	 * @see		HttpResponse#redirect(String, HttpStatus)
 	 */
-	public void redirect(String location) throws IOException {
-		HttpStatus status = this.status;
-		if (status == null)
-			status = HttpStatus.FOUND;
-		this.redirect(location, status);
-	}
-	
-	/**
-	 * End the handling by redirecting the client to location.
-	 * 
-	 * <p>The status specified will be send.
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param location
-	 * 			The location where the client should be redirected.
-	 * @param status
-	 * 			The {@link HttpStatus} to be send.
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 */
-	public void redirect(String location, HttpStatus status) throws IOException {
+	public void redirect(@NotNull String location) throws IOException {
+		Checks.notNull(location, "location");
 		this.getHeaders().add("Location", location);
-		this.end(status);
+		if (this.status == null)
+			this.status = HttpStatus.FOUND;
+		this.end();
 	}
-	
+
 	/**
 	 * End this handling.
 	 * 
 	 * <p>If set, the {@link HttpResponse#status actual status}
 	 * will be send, otherwise a default {@link HttpStatus#OK 200 OK}
-	 * status code is send.
+	 * status code is send.</p>
 	 * 
 	 * <p>If no response exists when this method is called,
-	 * the String status will be send as response.
+	 * the String status will be send as response.</p>
 	 * 
-	 * <p>This is a terminal operation.
-	 * 
+	 * <p>This is a terminal operation.</p>
+	 *
 	 * @throws IOException
 	 * 			If an I/O exception occurs, for example, if the
 	 * 			response was already send.
-	 * @see		HttpResponse#end(HttpStatus)
 	 */
 	public void end() throws IOException {
-		HttpStatus status = this.status;
-		if (status == null)
-			status = HttpStatus.OK;
-		this.end(status);
-	}
-	
-	/**
-	 * End this handling.
-	 * 
-	 * <p>The status specified will be send.
-	 * 
-	 * <p>If no response exists when this method is called,
-	 * the String status will be send as response.
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param status
-	 * 			The {@link HttpStatus} to be send.
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 * @see		HttpResponse#end(HttpStatus, String)
-	 */
-	public void end(HttpStatus status) throws IOException {
-		String response = "";
-		if (this.response.isEmpty())
-			response = "<h1>" + status.getStatus() + "</h1>";
-		this.end(status, response);
-	}
-	
-	/**
-	 * End this handling.
-	 * 
-	 * <p>If set, the {@link HttpResponse#status actual status}
-	 * will be send, otherwise a default {@link HttpStatus#OK 200 OK}
-	 * status code is send.
-	 * 
-	 * <p>The response will be buffered before ending the
-	 * handling.
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param response
-	 * 			The response to add to the buffer before ending
-	 * 			the handling.
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 * @see		HttpResponse#end(HttpStatus, String)
-	 */
-	public void end(String response) throws IOException {
-		HttpStatus status = this.status;
-		if (status == null)
-			status = HttpStatus.OK;
-		this.end(status, response);
-	}
-	
-	/**
-	 * End this handling.
-	 * 
-	 * <p>The status specified will be send.
-	 * 
-	 * <p>The response will be buffered before ending the
-	 * handling.
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param status
-	 * 			The {@link HttpStatus} to be send.
-	 * @param response
-	 * 			The response to add to the buffer before ending
-	 * 			the handling.
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 */
-	public void end(HttpStatus status, String response) throws IOException {
-		this.send(response);
-		byte[] responseByte = this.response.getBytes();
-		Handler.getExchange().sendResponseHeaders(status.getCode(), responseByte.length);
-		OutputStream responseBody = Handler.getExchange().getResponseBody();
+		if (this.status == null)
+			this.status = HttpStatus.OK;
+		if (this.response.length() == 0)
+			this.send("<h1>" + this.status.getStatus() + "</h1>");
+
+		byte[] responseByte = this.response.toString().getBytes();
+		this.exchange.sendResponseHeaders(this.status.getCode(), responseByte.length);
+		OutputStream responseBody = this.exchange.getResponseBody();
 		responseBody.write(responseByte);
 		responseBody.flush();
 		responseBody.close();
-		this.statusSent = true;
+		this.terminated = true;
 	}
-	
+
 	/**
 	 * End this handling without sending any response body.
-	 * 
-	 * <p>The status specified will be send.
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
-	 * @param status
-	 * 			The {@link HttpStatus} to be send.
-	 * @throws IOException
-	 * 			If an I/O exception occurs, for example, if the
-	 * 			response was already send.
-	 * @see		HttpResponse#endWithoutBody()
-	 */
-	public void endWithoutBody(HttpStatus status) throws IOException {
-		this.setStatus(status).endWithoutBody();
-	}
-	
-	/**
-	 * End this handling without sending any response body.
-	 * 
+	 *
 	 * <p>If set, the {@link HttpResponse#status actual status}
-	 * will be send, otherwise a default {@link HttpStatus#OK 200 OK}
-	 * status code is send.
-	 * 
-	 * <p>This is a terminal operation.
-	 * 
+	 * will be send, otherwise a default {@link HttpStatus#NO_CONTENT 204 No Content}
+	 * status code is send.</p>
+	 *
+	 * <p>This is a terminal operation.</p>
+	 *
 	 * @throws IOException
 	 * 			If an I/O exception occurs, for example, if the
 	 * 			response was already send.
 	 */
 	public void endWithoutBody() throws IOException {
-		HttpStatus status = this.getCurrentStatus();
-		if (status == null)
-			status = HttpStatus.OK;
-		Handler.getExchange().sendResponseHeaders(this.status.getCode(), -1);
+		if (this.status == null)
+			this.status = HttpStatus.NO_CONTENT;
+		this.exchange.sendResponseHeaders(status.getCode(), -1);
+		this.terminated = true;
 	}
-	
-	/**
-	 * Close this response
-	 * 
-	 * <p>This method should be called at the end of an exchange.
-	 */
-	void close() {
-		this.isInit = false;
-	}
-	
+
 	/**
 	 * Check whether or not a response have been sent.
 	 * 
 	 * @return	{@code true} if a response have been sent,
 	 * 			{@code false} otherwise.
 	 */
-	boolean isStatusSent() {
-		return this.statusSent;
+	public boolean isTerminated() {
+		return this.terminated;
+	}
+
+	/**
+	 * Log response informations using {@link Level#INFO}.
+	 */
+	public void logDebugInfo() {
+		this.logDebugInfo(Level.INFO);
+	}
+
+	/**
+	 *  Log response informations using the given {@link Level level}.
+	 *
+	 * @param level
+	 * 			The Level used to log informations.
+	 */
+	public void logDebugInfo(@NotNull Level level) {
+		Checks.notNull(level, "level");
+		LOGGER.log(level, "Debug caller: " + MiscUtils.caller());
+		LOGGER.log(level, "v ===== Debug informations for response ===== v");
+		LOGGER.log(level, "Response status: " + this.getStatus());
+		LOGGER.log(level, "Response body: " + this.response);
+		Headers headers = this.getHeaders();
+		LOGGER.log(level, "Response headers: (" + headers.size() + ")");
+		headers.forEach((key, valList) -> LOGGER.log(level, "\t" + key + ": " + String.join(", ", valList)));
+		LOGGER.log(level, "Server informations: " + this.server);
+		LOGGER.log(level, "^ ===== Debug informations for response ===== ^");
 	}
 }

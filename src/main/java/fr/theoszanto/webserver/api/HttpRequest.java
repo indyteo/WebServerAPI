@@ -1,134 +1,117 @@
 package fr.theoszanto.webserver.api;
 
+import com.sun.net.httpserver.Headers;
+import com.sun.net.httpserver.HttpExchange;
+import fr.theoszanto.webserver.WebServer;
+import fr.theoszanto.webserver.utils.Checks;
+import fr.theoszanto.webserver.utils.MiscUtils;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.UnmodifiableView;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Set;
-import java.util.function.BiConsumer;
+import java.util.Map;
+import java.util.StringJoiner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * The object representing the client request.
- * 
- * <p>This class is a singleton and should be initialized
- * before handling each exchange, and close after.
- * 
+ *
  * @author	indyteo
- * @see		HttpRequest#getInstance()
- * @see		HttpRequest#init()
- * @see		HttpRequest#close()
  */
 public final class HttpRequest {
+	/**
+	 * System logger for HttpRequest class.
+	 */
+	private static final @NotNull Logger LOGGER = Logger.getLogger(HttpRequest.class.getName());
+
+	/**
+	 * The server containing useful data such as the root or the router.
+	 *
+	 * @see		WebServer
+	 */
+	private final @NotNull WebServer server;
+
+	/**
+	 * The exchange containing client request data and server response
+	 * methods.
+	 *
+	 * @see		HttpExchange
+	 */
+	private final @NotNull HttpExchange exchange;
+
 	/**
 	 * The parameters of the request, either send in through
 	 * the request body, or in the request URL, according to
 	 * the request method.
-	 * 
-	 * <p>You can get the params with the key with the method
-	 * {@link HttpRequest#getParam(String)}. You can check if
-	 * a key is present with {@link HttpRequest#isParamKey(String)}
-	 * and get the key list with {@link HttpRequest#getParamKeys()}.
-	 * 
-	 * <p>Alternatively, you can execute a code for each param
-	 * with {@link HttpRequest#forEachParam(BiConsumer)}.
-	 * 
+	 *
 	 * @see		HttpMethod
-	 * @see		HttpRequest#getParam(String)
-	 * @see		HttpRequest#isParamKey(String)
-	 * @see		HttpRequest#getParamKeys()
-	 * @see		HttpRequest#forEachParam(BiConsumer)
+	 * @see		HttpRequest#getParams()
 	 */
-	private HashMap<String, String> params;
-	
+	private final @NotNull Map<String, String> params;
+
 	/**
-	 * Check whether or not the {@link HttpRequest#init()}
-	 * method have been called for this exchange.
-	 * 
-	 * <p>The {@link HttpRequest#close()} method reset this
-	 * value to {@code false}.
-	 * 
-	 * @see		HttpRequest#init()
-	 * @see		HttpRequest#close()
+	 * The parameters of the requested route, if any.
+	 *
+	 * @see		HttpRequest#getRouteParams()
 	 */
-	private boolean isInit;
-	
+	private @Nullable Map<String, String> routeParams;
+
 	/**
-	 * The unique instance of this class.
-	 * 
-	 * @see		HttpRequest#getInstance()
-	 */
-	private static HttpRequest instance = null;
-	
-	/**
-	 * Private constructor to prevent other instanciation.
-	 */
-	private HttpRequest() {
-		this.params = new HashMap<String, String>();
-		this.isInit = false;
-	}
-	
-	/**
-	 * Return the unique instance of this singleton class.
-	 * 
-	 * <p>The first call to this method will create the instance.
-	 * 
-	 * @return	The instance of the class.
-	 */
-	public static HttpRequest getInstance() {
-		if (instance == null)
-			instance = new HttpRequest();
-		return instance;
-	}
-	
-	/**
-	 * Launch the init process with the current HttpExchange
-	 * static field of the {@link Handler super-handler}.
-	 * 
-	 * <p>This should normally be call once by exchange.
-	 * 
+	 * Construct a new request from the client.
+	 *
+	 * @param server
+	 * 			The WebServer to bind this request to.
+	 * @param exchange
+	 * 			The exchange of the request.
 	 * @throws IOException
 	 * 			If an I/O exception occurs during the body-reading
 	 * 			process.
 	 */
-	void init() throws IOException {
-		if (this.isInit)
-			return;
-		
-		InputStream is = Handler.getExchange().getRequestBody();
-		String params = "";
+	public HttpRequest(@NotNull WebServer server, @NotNull HttpExchange exchange) throws IOException {
+		Checks.notNull(server, "server");
+		Checks.notNull(exchange, "exchange");
+		this.server = server;
+		this.exchange = exchange;
+		this.params = new HashMap<>();
+
+		InputStream is = exchange.getRequestBody();
+		StringBuilder params = new StringBuilder();
 		int byteRead;
 		while ((byteRead = is.read()) != -1)
-			params += (char) byteRead;
-		if (params.isEmpty())
-			params = Handler.getExchange().getRequestURI().getQuery();
-		this.parseParams(params);
-		
-		this.isInit = true;
+			params.append((char) byteRead);
+		this.parseParams(params.length() == 0 ? this.getURI().getQuery() : params.toString());
 	}
-	
+
 	/**
 	 * The method parse the String {@code params} which contains
 	 * HTTP request parameters, formatted as the standard.
 	 * 
-	 * <p>This input:
+	 * <p>This input:</p>
 	 * <blockquote><pre>
 	 * key1=value1&amp;key2=value+with+space+2
 	 * </pre></blockquote>
-	 * should produce the following:
+	 * <p>Should produce the following:</p>
 	 * <blockquote><pre>
 	 * params.put("key1", "value1");
 	 * params.put("key2", "value with space 2");
 	 * </pre></blockquote>
 	 * 
-	 * <p>Any malformed input part will be ignored.
+	 * <p>Any malformed input part will be ignored.</p>
 	 * 
 	 * @param params
 	 * 			The String representation of the params
 	 */
-	private void parseParams(String params) {
+	@Contract(mutates = "this")
+	private void parseParams(@Nullable String params) {
 		if (params == null)
 			return;
 		String[] pairs = params.replace('+', ' ').split("&");
@@ -136,66 +119,85 @@ public final class HttpRequest {
 			String[] val = pair.split("=");
 			try {
 				this.params.put(val[0], val[1]);
-			}
-			catch (ArrayIndexOutOfBoundsException e) {}
+			} catch (ArrayIndexOutOfBoundsException ignored) {}
 		}
 	}
-	
+
 	/**
-	 * Return the parameter associated to this key.
-	 * 
-	 * @param key
-	 * 			The key of the param to retrieve.
-	 * @return	The request param value for this key.
+	 * Set the current route parameters.
+	 *
+	 * @param routeParams
+	 * 			The map containing route parameters.
+	 */
+	@Contract(mutates = "this")
+	public void setRouteParams(@Nullable Map<String, String> routeParams) {
+		this.routeParams = routeParams;
+	}
+
+	/**
+	 * Return the request parameters.
+	 *
+	 * @return	The request body params.
 	 * @see		HttpRequest#params
 	 */
-	public String getParam(String key) {
+	@UnmodifiableView
+	@Contract(value = " -> new", pure = true)
+	public @NotNull Map<String, String> getParams() {
+		return Collections.unmodifiableMap(this.params);
+	}
+
+	/**
+	 * Return the value of the given request param.
+	 *
+	 * @param key
+	 * 			The name of the request param to retrieve.
+	 * @return	The request param value corresponding to the
+	 * 			key if it exists, {@code null} otherwise.
+	 * @see		HttpRequest#getParams()
+	 */
+	@Contract(pure = true)
+	public @Nullable String getParam(@NotNull String key) {
+		Checks.notNull(key, "key");
 		return this.params.get(key);
 	}
-	
+
 	/**
-	 * Return {@code true} if a param value is associated
-	 * to this key.
-	 * 
+	 * Return the route parameters.
+	 *
+	 * @return	The request route params.
+	 * @see		HttpRequest#routeParams
+	 */
+	@UnmodifiableView
+	@Contract(value = " -> new", pure = true)
+	public @NotNull Map<String, String> getRouteParams() {
+		return this.routeParams == null ? Collections.emptyMap() : Collections.unmodifiableMap(this.routeParams);
+	}
+
+	/**
+	 * Return the value of the given route param.
+	 *
 	 * @param key
-	 * 			The key that will be check
-	 * @return	{@code true} if a param value is associated
-	 * 			to the key, {@code false} otherwise.
+	 * 			The name of the route param to retrieve.
+	 * @return	The route param value corresponding to the
+	 * 			key if it exists, {@code null} otherwise.
+	 * @see		HttpRequest#getRouteParams()
 	 */
-	public boolean isParamKey(String key) {
-		return this.params.containsKey(key);
+	@Contract(pure = true)
+	public @Nullable String getRouteParam(@NotNull String key) {
+		Checks.notNull(key, "key");
+		return MiscUtils.get(this.routeParams, key);
 	}
-	
-	/**
-	 * Return a {@link Set} of String containing the param keys.
-	 * 
-	 * @return	A Set with all keys that have param associated with.
-	 */
-	public Set<String> getParamKeys() {
-		return this.params.keySet();
-	}
-	
-	/**
-	 * Execute the given {@code action} for each parameters.
-	 * 
-	 * <p>The action will be called with the key and the value.
-	 * 
-	 * @param action
-	 * 			The {@link BiConsumer} to execute.
-	 */
-	public void forEachParam(BiConsumer<String, String> action) {
-		this.params.forEach(action);
-	}
-	
+
 	/**
 	 * Return the requested {@link URI}.
 	 * 
 	 * @return	The URI of the request.
 	 */
-	public URI getURI() {
-		return Handler.getExchange().getRequestURI();
+	@Contract(pure = true)
+	public @NotNull URI getURI() {
+		return this.exchange.getRequestURI();
 	}
-	
+
 	/**
 	 * Return the {@link File} object corresponding to the
 	 * requested URI and the server root.
@@ -203,68 +205,69 @@ public final class HttpRequest {
 	 * @return	The File requested by the client, that might
 	 * 			not exist.
 	 */
-	public File getRequestedFile() {
-		return Paths.get(Handler.getServer().getRoot(), this.getURI().toString()).toFile();
+	@Contract(value = " -> new", pure = true)
+	public @NotNull File getRequestedFile() {
+		return Paths.get(this.server.getRoot(), this.getURI().toString()).toFile();
 	}
-	
+
 	/**
 	 * Return the method used in the request.
 	 * 
 	 * @return	The {@link HttpMethod} representing the method
 	 * 			used by the client in the request.
 	 */
-	public HttpMethod getMethod() {
-		return HttpMethod.parse(Handler.getExchange().getRequestMethod());
+	@Contract(pure = true)
+	public @NotNull HttpMethod getMethod() {
+		return HttpMethod.parse(this.exchange.getRequestMethod());
 	}
-	
+
 	/**
-	 * Return the first header value of the field received in
-	 * parameter of this method.
-	 * 
-	 * <p>The HTTP headers may have several values for a single
-	 * header field.
-	 * 
-	 * @param header
-	 * 			The field name (case insensitive) of the value to
-	 * 			retrieve.
-	 * @return	The header value corresponding to the field name.
+	 * Return the headers of the request.
+	 *
+	 * @return	The request {@link Headers headers}.
 	 */
-	public String getHeader(String header) {
-		return Handler.getExchange().getRequestHeaders().getFirst(header);
+	@UnmodifiableView
+	@Contract(pure = true)
+	public @NotNull Headers getHeaders() {
+		return this.exchange.getRequestHeaders();
 	}
-	
+
 	/**
-	 * Return the {@link List} of values associated to the field received
-	 * in parameter of this method.
-	 * 
-	 * @param header
-	 * 			The field name (case insensitive) of the values to
-	 * 			retrieve.
-	 * @return	A List of values corresponding to the field name.
+	 * Log request informations using {@link Level#INFO}.
 	 */
-	public List<String> getHeaders(String header) {
-		return Handler.getExchange().getRequestHeaders().get(header);
+	public void logDebugInfo() {
+		this.logDebugInfo(Level.INFO);
 	}
-	
+
 	/**
-	 * Execute the given {@code action} for each header fields.
-	 * 
-	 * <p>The action will be called with the field and the values.
-	 * 
-	 * @param action
-	 * 			The {@link BiConsumer} to execute.
+	 *  Log request informations using the given {@link Level level}.
+	 *
+	 * @param level
+	 * 			The Level used to log informations.
 	 */
-	public void forEachHeaders(BiConsumer<String, List<String>> action) {
-		Handler.getExchange().getRequestHeaders().forEach(action);
-	}
-	
-	/**
-	 * Close this request.
-	 * 
-	 * <p>This method should be called at the end of an exchange.
-	 */
-	void close() {
-		this.params.clear();
-		this.isInit = false;
+	public void logDebugInfo(@NotNull Level level) {
+		Checks.notNull(level, "level");
+		LOGGER.log(level, "Debug caller: " + MiscUtils.caller());
+		LOGGER.log(level, "v ===== Debug informations for request ===== v");
+		LOGGER.log(level, "Request method: " + this.getMethod());
+		LOGGER.log(level, "Request URI: " + this.getURI());
+		Headers headers = this.getHeaders();
+		LOGGER.log(level, "Request headers: (" + headers.size() + ")");
+		headers.forEach((key, valList) -> {
+			StringJoiner joiner = new StringJoiner(", ", "\t" + key + ": ", "");
+			for (String val : valList)
+				joiner.add(val);
+			LOGGER.log(level, joiner.toString());
+		});
+		LOGGER.log(level, "Request params: (" + this.params.size() + ")");
+		this.params.forEach((key, value) -> LOGGER.log(level, "\t" + key + ": " + value));
+		if (this.routeParams == null)
+			LOGGER.log(level, "No route params");
+		else {
+			LOGGER.log(level, "Route params: (" + this.routeParams.size() + ")");
+			this.routeParams.forEach((key, value) -> LOGGER.log(level, "\t" + key + ": " + value));
+		}
+		LOGGER.log(level, "Server informations: " + this.server);
+		LOGGER.log(level, "^ ===== Debug informations for request ===== ^");
 	}
 }

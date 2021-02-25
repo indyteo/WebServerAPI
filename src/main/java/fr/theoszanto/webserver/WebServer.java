@@ -2,55 +2,68 @@ package fr.theoszanto.webserver;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.net.InetSocketAddress;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.sun.net.httpserver.HttpServer;
 
-import fr.theoszanto.webserver.api.GetHandler;
-import fr.theoszanto.webserver.api.Handler;
-import fr.theoszanto.webserver.api.HandlersContainer;
+import fr.theoszanto.webserver.handler.Handler;
 import fr.theoszanto.webserver.api.HttpMethod;
-import fr.theoszanto.webserver.api.HttpMethodHandler;
-import fr.theoszanto.webserver.api.PostHandler;
+import fr.theoszanto.webserver.api.HttpStatus;
+import fr.theoszanto.webserver.handler.HandlersContainer;
+import fr.theoszanto.webserver.api.WebServerException;
+import fr.theoszanto.webserver.handler.IntermediateHandler;
+import fr.theoszanto.webserver.routing.RouteBuilder;
+import fr.theoszanto.webserver.routing.Router;
+import fr.theoszanto.webserver.utils.Checks;
+import fr.theoszanto.webserver.utils.MiscUtils;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 
 /**
- * The web server class, managing the requests and handlers.
+ * The web server class, managing the HTTP server.
  * 
  * @author	indyteo
- * @see		WebServer#registerHandlers(HandlersContainer)
+ * @see		WebServer#getRouter()
+ * @see		Router#registerHandlers(HandlersContainer)
  */
 public class WebServer {
 	/**
+	 * System logger for WebServer class.
+	 */
+	private static final @NotNull Logger LOGGER = Logger.getLogger(WebServer.class.getName());
+
+	/**
 	 * The HttpServer instance powering up the server.
 	 */
-	private HttpServer server;
-	
+	private final @NotNull HttpServer server;
+
 	/**
 	 * The port the server is currently listening.
 	 */
-	private int port;
-	
+	private final int port;
+
 	/**
-	 * The handlers defined to response to requests.
+	 * The router defined to map requests to handlers.
 	 */
-	private Map<String, Map<HttpMethod, Method>> handlers;
-	
+	private final @NotNull Router router;
+
 	/**
 	 * The root of the server.
 	 */
-	private String root;
-	
+	private final @NotNull String root;
+
 	/**
-	 * The instance containing the handlers.
+	 * The super-handler for all requests.
 	 */
-	private HandlersContainer handlersContainer;
-	
+	private final @NotNull Handler handler;
+
+	/**
+	 * Indicate whether the server is running or not.
+	 */
+	private boolean running;
+
 	/**
 	 * Create a new WebServer, listening on the port {@code port},
 	 * with the file root {@code root}.
@@ -60,37 +73,45 @@ public class WebServer {
 	 * @param root
 	 * 			The root of the server.
 	 */
-	public WebServer(int port, String root) {
+	public WebServer(int port, @NotNull String root) throws WebServerException {
+		Checks.notNull(root, "root");
 		this.port = port;
-		this.handlers = new HashMap<String, Map<HttpMethod, Method>>();
 		this.root = root;
-		this.handlersContainer = null;
+		this.router = new Router();
+
 		try {
-			System.out.println("Starting server...");
-			System.out.println("Listening port: " + this.port);
-			
-			System.out.println("Root directory: " + this.root);
+			LOGGER.info("Starting server...");
+			LOGGER.config("Listening port: " + this.port);
+			LOGGER.config("Root directory: " + this.root);
 			File f = new File(this.root);
-			if (! f.isDirectory()) {
-				f.mkdirs();
-				System.out.println("Created \"" + this.root + "\" directory.");
+			if (!f.isDirectory()) {
+				if (f.mkdirs())
+					LOGGER.info("Created \"" + this.root + "\" directory.");
+				else
+					throw new IOException("Unable to create the root directory \"" + this.root + "\".");
 			}
-			
+
 			this.server = HttpServer.create(new InetSocketAddress(this.port), 0);
-			
-			Handler.setServer(this);
-			this.server.createContext("/", Handler.getInstance());
-			
+
+			this.handler = new Handler(this);
+			this.server.createContext("/", this.handler);
+
+			this.router.registerIntermediateRoute(new RouteBuilder()
+					.setName("Unknown methods filter")
+					.setRoute("/")
+					.setMethod(HttpMethod.UNKNOWN)
+					.setIntermediateHandler(IntermediateHandler.endingWithStatus(HttpStatus.METHOD_NOT_ALLOWED))
+					.buildIntermediateRoute());
+
 			this.server.start();
-			
-			System.out.println("Server started!");
+			this.running = true;
+			LOGGER.info("Server started!");
 		} catch (IOException e) {
-			System.err.println("Unable to start server.");
-			this.close();
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, "Unable to start server.", e);
+			throw new WebServerException("A fatal error occured while starting server.", e);
 		}
 	}
-	
+
 	/**
 	 * Create a new WebServer, listening on the port {@code port},
 	 * with the current working directory as file root.
@@ -102,135 +123,101 @@ public class WebServer {
 	public WebServer(int port) {
 		this(port, System.getProperty("user.dir", ""));
 	}
-	
+
 	/**
-	 * Close this WebServer, making it no more listening requests.
+	 * Immediately close this WebServer, making it no more
+	 * listening requests, without any delay.
+	 *
+	 * <p>If any, current handlers will be stopped.</p>
 	 * 
-	 * <p>It's impossible to re-open a closed WebServer.
+	 * <p>Note: It's impossible to re-open a closed WebServer.</p>
 	 */
 	public void close() {
-		if (this.server != null)
-			this.server.stop(0);
-		System.out.println("Server closed!");
+		this.close(0);
 	}
-	
+
 	/**
-	 * Register handlers contained in the HandlersContainer instance you
-	 * gave.
-	 * 
-	 * <p>You cannot register more that one instance of HandlersContainer.
-	 * 
-	 * <p>Registering handlers with an instance with this method will clear
-	 * the previously non-static registered handlers.
-	 * 
-	 * @param handlers
-	 * 			The instance of the {@link HandlersContainer handlers container}
-	 * 			to register.
+	 * Close this WebServer, making it no more listening requests.
+	 *
+	 * <p>Note: It's impossible to re-open a closed WebServer.</p>
+	 *
+	 * @param maximumDelay
+	 * 			The maximum number of seconds to wait before closing
+	 * 			current handlers.
 	 */
-	public void registerHandlers(HandlersContainer handlers) {
-		this.handlersContainer = handlers;
-		Iterator<String> i = this.handlers.keySet().iterator();
-		while (i.hasNext())
-			this.handlers.get(i.next()).entrySet().removeIf(h -> ! Modifier.isStatic(h.getValue().getModifiers()));
-		
-		this.registerHandlers(handlers.getClass(), true);
+	public void close(int maximumDelay) {
+		this.server.stop(maximumDelay);
+		this.running = false;
+		LOGGER.info("Server closed!");
 	}
-	
+
 	/**
-	 * Register static handlers contained in the HandlersContainer class.
-	 * 
-	 * @param handlers
-	 * 			The class where the handlers are.
+	 * Return the router.
+	 *
+	 * @return  The router.
 	 */
-	public void registerHandlers(Class<? extends HandlersContainer> handlers) {
-		this.registerHandlers(handlers, false);
+	@Contract(pure = true)
+	public @NotNull Router getRouter() {
+		return this.router;
 	}
-	
-	/**
-	 * Register handlers contained in the HandlersContainer class.
-	 * 
-	 * @param handlers
-	 * 			The class where the handlers are.
-	 * @param all
-	 * 			If the method should register all annoted methods
-	 * 			or only static.
-	 */
-	private void registerHandlers(Class<? extends HandlersContainer> handlers, boolean all) {
-		for (Method m : handlers.getDeclaredMethods()) {
-			
-			if (all ? true : Modifier.isStatic(m.getModifiers())) {
-				if (m.isAnnotationPresent(GetHandler.class))
-					this.registerHandler(m.getAnnotation(GetHandler.class).value(), m, HttpMethod.GET);
-				else if (m.isAnnotationPresent(PostHandler.class))
-					this.registerHandler(m.getAnnotation(PostHandler.class).value(), m, HttpMethod.POST);
-				else if (m.isAnnotationPresent(HttpMethodHandler.class))
-					this.registerHandler(m.getAnnotation(HttpMethodHandler.class).route(), m, m.getAnnotation(HttpMethodHandler.class).method());
-			}
-		}
-	}
-	
-	/**
-	 * Register the handling method {@code handler} for the route
-	 * {@code route} and the methods {@code methods}.
-	 * 
-	 * @param route
-	 * 			The route to bind the handler.
-	 * @param handler
-	 * 			The handler to bind to this route.
-	 * @param methods
-	 * 			The methods that should trigger the handler.
-	 */
-	private void registerHandler(String route, Method handler, HttpMethod... methods) {
-		Map<HttpMethod, Method> h = this.handlers.get(route);
-		// Add route if there were no handlers for it
-		if (h == null) {
-			h = new HashMap<HttpMethod, Method>();
-			this.handlers.put(route, h);
-		}
-		
-		for (HttpMethod m : methods)
-			h.put(m, handler);
-	}
-	
-	/**
-	 * Return the most complete handler corresponding to the
-	 * given route with the given method.
-	 * 
-	 * @param route
-	 * 			The route of the handler.
-	 * @param method
-	 * 			The method of the handler.
-	 * @return	The handler method if it exists,
-	 * 			{@code null} otherwise.
-	 */
-	public Method getHandler(String route, HttpMethod method) {
-		Set<String> keys = this.handlers.keySet();
-		String matchedKey = "";
-		for (String key : keys) {
-			if (route.toLowerCase().startsWith(key.toLowerCase()) && key.length() > matchedKey.length())
-				matchedKey = key;
-		}
-		
-		Map<HttpMethod, Method> h = this.handlers.get(matchedKey);
-		return h == null ? null : h.get(method);
-	}
-	
+
 	/**
 	 * Return the file root of the server.
 	 * 
 	 * @return	The root the of the server.
 	 */
-	public String getRoot() {
+	@Contract(pure = true)
+	public @NotNull String getRoot() {
 		return this.root;
 	}
-	
+
 	/**
-	 * Return the instance of the handlersContainer, used
-	 * to call to handlers.
-	 * 
-	 * @return	The last registered instance of HandlersContainer.
+	 * Return the port the current server is listening to.
+	 *
+	 * @return	The port the server is listening.
 	 */
-	public HandlersContainer getHandlerContainer() {
-		return this.handlersContainer;
+	@Contract(pure = true)
+	public int getPort() {
+		return this.port;
+	}
+
+	/**
+	 * Return the super-handler the server is currently using.
+	 *
+	 * @return	The super-handler used by the server to route request.
+	 */
+	@Contract(pure = true)
+	public @NotNull Handler getHandler() {
+		return this.handler;
+	}
+
+	/**
+	 * Log server informations using {@link Level#INFO}.
+	 */
+	public void logDebugInfo() {
+		this.logDebugInfo(Level.INFO);
+	}
+
+	/**
+	 *  Log server informations using the given {@link Level level}.
+	 *
+	 * @param level
+	 * 			The Level used to log informations.
+	 */
+	public void logDebugInfo(@NotNull Level level) {
+		Checks.notNull(level, "level");
+		LOGGER.log(level, "Debug caller: " + MiscUtils.caller());
+		LOGGER.log(level, "v ===== Debug informations for server ===== v");
+		LOGGER.log(level, "Listening port: " + this.getPort());
+		LOGGER.log(level, "Root directory: " + this.getRoot());
+		LOGGER.log(level, "Server address: " + this.server.getAddress());
+		LOGGER.log(level, "Server status: " + (this.running ? "Running" : "Closed"));
+		LOGGER.log(level, "^ ===== Debug informations for server ===== ^");
+	}
+
+	@Override
+	@Contract(value = " -> new", pure = true)
+	public @NotNull String toString() {
+		return this.running ? "WebServer running at " + this.getPort() : "Closed WebServer";
 	}
 }

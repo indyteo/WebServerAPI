@@ -1,16 +1,20 @@
 package fr.theoszanto.webserver.api;
 
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 /**
  * List of HTTP Methods used in HTTP requests.
  * 
  * <p>HTTP defines methods (sometimes referred to as verbs, but
  * nowhere in the specification does it mention verb, nor is
  * OPTIONS or HEAD a verb) to indicate the desired action to
- * be performed on the identified resource.
+ * be performed on the identified resource.</p>
  * 
  * <p>You can use the {@code static} method
  * {@link HttpMethod#parse(String)} to get the HTTP Method
- * corresponding to a String.
+ * corresponding to a String.</p>
  * 
  * @author	indyteo
  * @see		HttpMethod#parse(String)
@@ -83,8 +87,32 @@ public enum HttpMethod {
 	 * The PATCH method applies partial modifications to a
 	 * resource.
 	 */
-	PATCH;
-	
+	PATCH,
+	/**
+	 * Unknown or malformed HTTP method.
+	 */
+	UNKNOWN;
+
+	/**
+	 * Special value to handle all methods.
+	 */
+	public static final @Nullable HttpMethod ALL_METHODS = null;
+
+	/**
+	 * All valid HTTP methods.
+	 */
+	public static final @NotNull HttpMethod[] KNOWN_METHODS = {
+			HttpMethod.CONNECT,
+			HttpMethod.DELETE,
+			HttpMethod.GET,
+			HttpMethod.HEAD,
+			HttpMethod.OPTIONS,
+			HttpMethod.PATCH,
+			HttpMethod.POST,
+			HttpMethod.PUT,
+			HttpMethod.TRACE
+	};
+
 	/**
 	 * Return the HTTP Method corresponding to the String
 	 * representation of the method given in param.
@@ -95,15 +123,17 @@ public enum HttpMethod {
 	 * @return	The HTTP Method corresponding to the String
 	 * 			if it exists, {@code null} otherwise.
 	 */
-	public static HttpMethod parse(String method) {
+	@Contract(pure = true)
+	public static @NotNull HttpMethod parse(@Nullable String method) {
+		if (method == null)
+			return UNKNOWN;
 		try {
 			return valueOf(method.toUpperCase());
-		}
-		catch (IllegalArgumentException e) {
-			return null;
+		} catch (IllegalArgumentException e) {
+			return UNKNOWN;
 		}
 	}
-	
+
 	/**
 	 * Return {@code 1} if a request using this method has a
 	 * body, {@code -1} if it hasn't and {@code 0} if the
@@ -112,6 +142,7 @@ public enum HttpMethod {
 	 * @return	{@code 1}, {@code 0} or {@code -1} depending
 	 * 			of the method used.
 	 */
+	@Contract(pure = true)
 	public int hasRequestBody() {
 		switch (this) {
 		case POST:
@@ -124,18 +155,19 @@ public enum HttpMethod {
 			return 0;
 		}
 	}
-	
+
 	/**
 	 * Return {@code true} if a response to a request using
 	 * this method needs a body.
-	 * 
+	 *
 	 * @return	{@code true} if the response needs to have
 	 * 			a body, {@code false} otherwise.
 	 */
+	@Contract(pure = true)
 	public boolean needResponseBody() {
 		return this != HEAD;
 	}
-	
+
 	/**
 	 * Return {@code true} if the method is considered as
 	 * "safe".
@@ -144,6 +176,7 @@ public enum HttpMethod {
 	 * 			{@code false} otherwise.
 	 * @see		<a href="https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Safe_methods">Safe Methods</a>
 	 */
+	@Contract(pure = true)
 	public boolean isSafe() {
 		switch (this) {
 		case GET:
@@ -155,7 +188,7 @@ public enum HttpMethod {
 			return false;
 		}
 	}
-	
+
 	/**
 	 * Return {@code true} if the method is considered as
 	 * "idempotent".
@@ -164,6 +197,7 @@ public enum HttpMethod {
 	 * 			{@code false} otherwise.
 	 * @see		<a href="https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Idempotent_methods_and_web_applications">Idempotent Methods</a>
 	 */
+	@Contract(pure = true)
 	public boolean isIdempotent() {
 		switch (this) {
 		case POST:
@@ -174,7 +208,7 @@ public enum HttpMethod {
 			return true;
 		}
 	}
-	
+
 	/**
 	 * Return {@code true} if the method can be store in
 	 * the cache.
@@ -182,6 +216,7 @@ public enum HttpMethod {
 	 * @return	{@code true} if the method is cacheable,
 	 * 			{@code false} otherwise.
 	 */
+	@Contract(pure = true)
 	public boolean isCacheable() {
 		switch (this) {
 		case GET:
@@ -192,14 +227,16 @@ public enum HttpMethod {
 			return false;
 		}
 	}
-	
+
 	/**
 	 * Return the String representation of this HTTP Method.
 	 * 
 	 * @return	The String representation of this HTTP
 	 * 			Method.
 	 */
-	public String toString() {
+	@Override
+	@Contract(value = " -> new", pure = true)
+	public @NotNull String toString() {
 		return this.name();
 	}
 }

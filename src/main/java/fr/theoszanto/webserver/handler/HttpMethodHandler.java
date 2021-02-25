@@ -1,12 +1,15 @@
-package fr.theoszanto.webserver.api;
+package fr.theoszanto.webserver.handler;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import fr.theoszanto.webserver.WebServer;
+import fr.theoszanto.webserver.api.HttpMethod;
+import fr.theoszanto.webserver.routing.Router;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Annotation used to mark methods from
@@ -15,10 +18,10 @@ import fr.theoszanto.webserver.WebServer;
  * {@link HttpMethod method(s)}.
  * 
  * <p>There are two shortcut annotations {@link GetHandler} and {@link PostHandler}
- * for the two most common HttpMethods.
+ * for the two most common HttpMethods.</p>
  * 
  * @author	indyteo
- * @see		WebServer#registerHandlers(HandlersContainer)
+ * @see		Router#registerHandlers(HandlersContainer)
  * @see		HttpMethod
  * @see		GetHandler
  * @see		PostHandler
@@ -26,24 +29,25 @@ import fr.theoszanto.webserver.WebServer;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
+@Repeatable(HttpMethodHandler.Repeated.class)
 public @interface HttpMethodHandler {
 	/**
 	 * The base route defining which routes handle.
 	 * 
 	 * <p>Note that if multiple handlers matches a route,
-	 * only the most complete is called.
+	 * only the most complete is called.</p>
 	 * 
 	 * @return	The base route for this handler method.
 	 */
-	public String route() default "/";
-	
+	@NotNull String route() default "/";
+
 	/**
 	 * The {@link HttpMethod}(s) that should be handled by this
 	 * handler method.
 	 * 
 	 * @return	All methods handled by this handler method.
 	 */
-	public HttpMethod[] method() default {
+	@NotNull HttpMethod[] methods() default {
 			HttpMethod.CONNECT,
 			HttpMethod.DELETE,
 			HttpMethod.GET,
@@ -54,4 +58,22 @@ public @interface HttpMethodHandler {
 			HttpMethod.PUT,
 			HttpMethod.TRACE
 	};
+
+	/**
+	 * Whether the request may be longer or not.
+	 *
+	 * @return  {@code true} if the route need to completely
+	 *          match the requested path, {@code false} otherwise.
+	 */
+	boolean strict() default false;
+
+	/**
+	 * Repeatable annotation container
+	 */
+	@Documented
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target(ElementType.METHOD)
+	@interface Repeated {
+		@NotNull HttpMethodHandler[] value();
+	}
 }
