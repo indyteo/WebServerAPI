@@ -2,6 +2,7 @@ package fr.theoszanto.webserver.routing;
 
 import fr.theoszanto.webserver.handler.HandlersContainer;
 import fr.theoszanto.webserver.api.HttpMethod;
+import fr.theoszanto.webserver.handler.HandlingEndException;
 import fr.theoszanto.webserver.handler.IntermediateHandler;
 import fr.theoszanto.webserver.handler.IntermediateHandlersContainer;
 import fr.theoszanto.webserver.handler.RequestHandler;
@@ -99,6 +100,8 @@ public class RouteBuilder {
 			try {
 				handler.invoke(container, request, response);
 			} catch (IllegalAccessException | InvocationTargetException e) {
+				if (e.getCause() instanceof HandlingEndException)
+					throw (HandlingEndException) e.getCause();
 				throw new IOException("An exception occured during request handling", e);
 			}
 		};
@@ -112,6 +115,8 @@ public class RouteBuilder {
 			try {
 				return (boolean) handler.invoke(container, request, response);
 			} catch (IllegalAccessException | InvocationTargetException e) {
+				if (e.getCause() instanceof HandlingEndException)
+					throw (HandlingEndException) e.getCause();
 				throw new IOException("An exception occured during request intermediate handling", e);
 			}
 		};

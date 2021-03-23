@@ -1,24 +1,25 @@
 package fr.theoszanto.webserver.api;
 
+import com.sun.net.httpserver.Headers;
+import com.sun.net.httpserver.HttpExchange;
+import fr.theoszanto.webserver.WebServer;
+import fr.theoszanto.webserver.handler.HandlingEndException;
+import fr.theoszanto.webserver.utils.Checks;
+import fr.theoszanto.webserver.utils.JsonUtils;
+import fr.theoszanto.webserver.utils.MiscUtils;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Type;
 import java.nio.file.Paths;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import com.sun.net.httpserver.Headers;
-
-import com.sun.net.httpserver.HttpExchange;
-import fr.theoszanto.webserver.WebServer;
-import fr.theoszanto.webserver.handler.Handler;
-import fr.theoszanto.webserver.utils.Checks;
-import fr.theoszanto.webserver.utils.MiscUtils;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * The object representing the server response.
@@ -56,16 +57,6 @@ public final class HttpResponse {
 	 * The status to be send when calling {@link HttpResponse#end()}
 	 */
 	private @Nullable HttpStatus status;
-
-	/**
-	 * Check whether or not a terminal operation
-	 * have been called for this exchange.
-	 * 
-	 * <p>If this field is {@code false} when the Handle
-	 * terminate, the {@link Handler super-handler} will send
-	 * a default {@link HttpStatus#NOT_FOUND 404 Not Found}.</p>
-	 */
-	private boolean terminated;
 
 	/**
 	 * Construct a new response from the server.
@@ -162,6 +153,57 @@ public final class HttpResponse {
 	}
 
 	/**
+	 * Load a JSON file from the server.
+	 *
+	 * @param path
+	 * 			The path of the JSON file.
+	 * @param type
+	 * 			The type or class of the JSON data.
+	 * @param <T>
+	 * 			The type of the JSON data.
+	 * @return	The loaded JSON data.
+	 * @throws IOException
+	 * 			If an I/O exception occurs, for example,
+	 * 			if the file doesn't exists.
+	 */
+	@Contract(value = "null, _ -> null; !null, _ -> !null", pure = true)
+	public <T> @Nullable T loadJson(@Nullable String path, @NotNull Type type) throws IOException {
+		return JsonUtils.fromFile(this.server, path, type);
+	}
+
+	/**
+	 * Save a JSON file to the server.
+	 *
+	 * @param path
+	 * 			The path of the JSON file.
+	 * @param object
+	 * 			The JSON data to save.
+	 * @throws IOException
+	 * 			If an I/O exception occurs, for example,
+	 * 			if the file can't be created.
+	 */
+	public void saveJson(@NotNull String path, @Nullable Object object) throws IOException {
+		JsonUtils.toFile(this.server, path, object);
+	}
+
+	/**
+	 * End the handling by sending the specified object
+	 * in a JSON format.
+	 *
+	 * @param response
+	 * 			The element to be translated into JSON
+	 * 			then sent to the client.
+	 * @throws IOException
+	 * 			If an I/O exception occurs, for example,
+	 * 			if the response was already send.
+	 */
+	@Contract(mutates = "this")
+	public void sendJson(@Nullable Object response) throws IOException {
+		this.response.append(JsonUtils.GSON.toJson(response));
+		this.contentType(HttpMIMEType.JSON).end();
+	}
+
+	/**
 	 * Define the HttpStatus to be send when
 	 * calling {@link HttpResponse#end()}.
 	 * 
@@ -224,6 +266,7 @@ public final class HttpResponse {
 	 * 			response was already send.
 	 * @see		HttpResponse.FileResponse
 	 */
+	@Contract(value = "_ -> fail", mutates = "this")
 	public void sendFile(@NotNull FileResponse fileResponse) throws IOException {
 		Checks.notNull(fileResponse, "file");
 
@@ -265,7 +308,7 @@ public final class HttpResponse {
 			responseBody.flush();
 			responseBody.close();
 			fs.close();
-			this.terminated = true;
+			throw new HandlingEndException();
 		} catch (FileNotFoundException e) {
 			// Or a 404 Not Found error
 			this.setStatus(HttpStatus.NOT_FOUND).contentType(HttpMIMEType.HTML).end();
@@ -450,6 +493,19 @@ public final class HttpResponse {
 		}
 	}
 
+	@Contract(value = "_ -> fail", mutates = "this")
+	public void sendTemplate(HtmlTemplate template) throws IOException {
+		if (this.status == null)
+			this.status = HttpStatus.OK;
+		this.contentType(HttpMIMEType.HTML);
+		this.exchange.sendResponseHeaders(this.status.getCode(), 0);
+		OutputStream responseBody = this.exchange.getResponseBody();
+		template.send(responseBody);
+		responseBody.flush();
+		responseBody.close();
+		throw new HandlingEndException();
+	}
+
 	/**
 	 * End the handling by redirecting the client to location.
 	 * 
@@ -465,6 +521,7 @@ public final class HttpResponse {
 	 * 			If an I/O exception occurs, for example, if the
 	 * 			response was already send.
 	 */
+	@Contract(mutates = "this")
 	public void redirect(@NotNull String location) throws IOException {
 		Checks.notNull(location, "location");
 		this.getHeaders().add("Location", location);
@@ -489,6 +546,7 @@ public final class HttpResponse {
 	 * 			If an I/O exception occurs, for example, if the
 	 * 			response was already send.
 	 */
+	@Contract(value = " -> fail", mutates = "this")
 	public void end() throws IOException {
 		if (this.status == null)
 			this.status = HttpStatus.OK;
@@ -501,7 +559,7 @@ public final class HttpResponse {
 		responseBody.write(responseByte);
 		responseBody.flush();
 		responseBody.close();
-		this.terminated = true;
+		throw new HandlingEndException();
 	}
 
 	/**
@@ -517,21 +575,12 @@ public final class HttpResponse {
 	 * 			If an I/O exception occurs, for example, if the
 	 * 			response was already send.
 	 */
+	@Contract(value = " -> fail", mutates = "this")
 	public void endWithoutBody() throws IOException {
 		if (this.status == null)
 			this.status = HttpStatus.NO_CONTENT;
 		this.exchange.sendResponseHeaders(status.getCode(), -1);
-		this.terminated = true;
-	}
-
-	/**
-	 * Check whether or not a response have been sent.
-	 * 
-	 * @return	{@code true} if a response have been sent,
-	 * 			{@code false} otherwise.
-	 */
-	public boolean isTerminated() {
-		return this.terminated;
+		throw new HandlingEndException();
 	}
 
 	/**

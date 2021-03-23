@@ -243,6 +243,7 @@ public class HttpMIMEType {
 		if (extention == null || extention.isEmpty())
 			return DEFAULT;
 
+		extention = extention.toLowerCase();
 		// And the native MIME types
 		for (HttpMIMEType type : registry)
 			if (type.getExtentions().contains(extention))
@@ -277,10 +278,12 @@ public class HttpMIMEType {
 	 * 			The string MIME to get the MIME type.
 	 * @return	The MIME type corresponding to the string MIME.
 	 */
-	@Contract(pure = true)
-	public static @Nullable HttpMIMEType fromMIME(@NotNull String mime) {
+	@Contract(value = "null -> null", pure = true)
+	public static @Nullable HttpMIMEType fromMIME(@Nullable String mime) {
+		if (mime == null)
+			return null;
 		for (HttpMIMEType type : registry)
-			if (mime.equals(type.mime))
+			if (type.mime.equalsIgnoreCase(mime))
 				return type;
 		return null;
 	}

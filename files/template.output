@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="fr">
+	<head>
+		<meta charset="UTF-8" />
+		<title>Template test</title>
+	</head>
+	<body>
+		<h1>Hello World!</h1>
+		<p>Lorem ispum j'ai la flemme</p>
+		<p>{escaped}</p>
+		<p>7</p>
+	</body>
+</html>

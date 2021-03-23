@@ -4,6 +4,7 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import fr.theoszanto.webserver.WebServer;
 import fr.theoszanto.webserver.utils.Checks;
+import fr.theoszanto.webserver.utils.JsonUtils;
 import fr.theoszanto.webserver.utils.MiscUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -17,6 +18,7 @@ import java.net.URI;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
 import java.util.logging.Level;
@@ -49,6 +51,13 @@ public final class HttpRequest {
 	private final @NotNull HttpExchange exchange;
 
 	/**
+	 * The request headers.
+	 *
+	 * @see		HttpRequest#getHeaders()
+	 */
+	private final @NotNull Headers headers;
+
+	/**
 	 * The parameters of the request, either send in through
 	 * the request body, or in the request URL, according to
 	 * the request method.
@@ -56,7 +65,12 @@ public final class HttpRequest {
 	 * @see		HttpMethod
 	 * @see		HttpRequest#getParams()
 	 */
-	private final @NotNull Map<String, String> params;
+	private final @Nullable Map<String, String> params;
+
+	/**
+	 * The JSON parsed body of the request.
+	 */
+	private final @Nullable Object jsonParams;
 
 	/**
 	 * The parameters of the requested route, if any.
@@ -67,6 +81,22 @@ public final class HttpRequest {
 
 	/**
 	 * Construct a new request from the client.
+	 *
+	 * <p>If the {@code Content-type} request header is set to
+	 * {@link HttpMIMEType#JSON application/json}, the body is
+	 * parsed as JSON.</p>
+	 *
+	 * <p>Otherwise, this input:</p>
+	 * <blockquote><pre>
+	 * key1=value1&amp;key2=value+with+space+2
+	 * </pre></blockquote>
+	 * <p>Should produce the following:</p>
+	 * <blockquote><pre>
+	 * params.put("key1", "value1");
+	 * params.put("key2", "value with space 2");
+	 * </pre></blockquote>
+	 *
+	 * <p>Any malformed input part will be ignored.</p>
 	 *
 	 * @param server
 	 * 			The WebServer to bind this request to.
@@ -81,47 +111,45 @@ public final class HttpRequest {
 		Checks.notNull(exchange, "exchange");
 		this.server = server;
 		this.exchange = exchange;
-		this.params = new HashMap<>();
+		this.headers = exchange.getRequestHeaders();
 
 		InputStream is = exchange.getRequestBody();
-		StringBuilder params = new StringBuilder();
+		StringBuilder paramsReader = new StringBuilder();
 		int byteRead;
 		while ((byteRead = is.read()) != -1)
-			params.append((char) byteRead);
-		this.parseParams(params.length() == 0 ? this.getURI().getQuery() : params.toString());
+			paramsReader.append((char) byteRead);
+		String params = paramsReader.length() == 0 ? this.getURI().getQuery() : paramsReader.toString();
+
+		if (HttpMIMEType.fromMIME(this.header("Content-type")) == HttpMIMEType.JSON) {
+			this.params = null;
+			this.jsonParams = JsonUtils.GSON.fromJson(params, Object.class);
+		} else if (params != null) {
+			this.params = new HashMap<>();
+			this.jsonParams = null;
+			String[] pairs = params.replace('+', ' ').split("&");
+			for (String pair : pairs) {
+				String[] val = pair.split("=");
+				try {
+					this.params.put(val[0], val[1]);
+				} catch (ArrayIndexOutOfBoundsException ignored) {}
+			}
+		} else {
+			this.params = null;
+			this.jsonParams = null;
+		}
 	}
 
 	/**
 	 * The method parse the String {@code params} which contains
-	 * HTTP request parameters, formatted as the standard.
-	 * 
-	 * <p>This input:</p>
-	 * <blockquote><pre>
-	 * key1=value1&amp;key2=value+with+space+2
-	 * </pre></blockquote>
-	 * <p>Should produce the following:</p>
-	 * <blockquote><pre>
-	 * params.put("key1", "value1");
-	 * params.put("key2", "value with space 2");
-	 * </pre></blockquote>
-	 * 
-	 * <p>Any malformed input part will be ignored.</p>
+	 * HTTP request parameters, formatted as the standard or JSON.
+	 *
+	 *
 	 * 
 	 * @param params
 	 * 			The String representation of the params
 	 */
 	@Contract(mutates = "this")
-	private void parseParams(@Nullable String params) {
-		if (params == null)
-			return;
-		String[] pairs = params.replace('+', ' ').split("&");
-		for (String pair : pairs) {
-			String[] val = pair.split("=");
-			try {
-				this.params.put(val[0], val[1]);
-			} catch (ArrayIndexOutOfBoundsException ignored) {}
-		}
-	}
+	private void parseParams(@Nullable String params) {}
 
 	/**
 	 * Set the current route parameters.
@@ -142,8 +170,8 @@ public final class HttpRequest {
 	 */
 	@UnmodifiableView
 	@Contract(value = " -> new", pure = true)
-	public @NotNull Map<String, String> getParams() {
-		return Collections.unmodifiableMap(this.params);
+	public @Nullable Map<String, String> getParams() {
+		return MiscUtils.ifNotNull(this.params, Collections::unmodifiableMap);
 	}
 
 	/**
@@ -158,7 +186,17 @@ public final class HttpRequest {
 	@Contract(pure = true)
 	public @Nullable String getParam(@NotNull String key) {
 		Checks.notNull(key, "key");
-		return this.params.get(key);
+		return MiscUtils.ifNotNull(this.params, params -> params.get(key));
+	}
+
+	/**
+	 * Return the JSON parsed body.
+	 *
+	 * @return	The JSON parsed body.
+	 */
+	@Contract(pure = true)
+	public @Nullable Object getJsonParams() {
+		return this.jsonParams;
 	}
 
 	/**
@@ -229,7 +267,31 @@ public final class HttpRequest {
 	@UnmodifiableView
 	@Contract(pure = true)
 	public @NotNull Headers getHeaders() {
-		return this.exchange.getRequestHeaders();
+		return this.headers;
+	}
+
+	/**
+	 * Return the header values for the given name.
+	 *
+	 * @param name
+	 * 			The name of the headers to retrieve.
+	 * @return	The list of values for this header.
+	 */
+	@Contract(pure = true)
+	public @Nullable List<String> headers(@NotNull String name) {
+		return this.getHeaders().get(name);
+	}
+
+	/**
+	 * Return the header value for the given name.
+	 *
+	 * @param name
+	 * 			The name of the header to retrieve.
+	 * @return	The value for this header.
+	 */
+	@Contract(pure = true)
+	public @Nullable String header(@NotNull String name) {
+		return this.getHeaders().getFirst(name);
 	}
 
 	/**
@@ -259,8 +321,13 @@ public final class HttpRequest {
 				joiner.add(val);
 			LOGGER.log(level, joiner.toString());
 		});
-		LOGGER.log(level, "Request params: (" + this.params.size() + ")");
-		this.params.forEach((key, value) -> LOGGER.log(level, "\t" + key + ": " + value));
+		if (this.params == null) {
+			if (this.jsonParams != null)
+				LOGGER.log(level, "Request JSON body: " + this.jsonParams);
+		} else {
+			LOGGER.log(level, "Request params: (" + this.params.size() + ")");
+			this.params.forEach((key, value) -> LOGGER.log(level, "\t" + key + ": " + value));
+		}
 		if (this.routeParams == null)
 			LOGGER.log(level, "No route params");
 		else {

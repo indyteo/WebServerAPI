@@ -1,12 +1,7 @@
 package fr.theoszanto.webserver.handler;
 
-import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-
 import fr.theoszanto.webserver.WebServer;
 import fr.theoszanto.webserver.api.HttpRequest;
 import fr.theoszanto.webserver.api.HttpResponse;
@@ -15,6 +10,10 @@ import fr.theoszanto.webserver.api.WebServerException;
 import fr.theoszanto.webserver.routing.Router;
 import fr.theoszanto.webserver.utils.Checks;
 import org.jetbrains.annotations.NotNull;
+
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * The HttpHandler which link the server to the API.
@@ -69,18 +68,20 @@ public class Handler implements HttpHandler {
 
 		try {
 			this.server.getRouter().handle(request, response);
+
+			// Executed only if handler did not terminate
+			if (response.getStatus() == null)
+				response.setStatus(HttpStatus.NOT_FOUND);
+			if (request.getMethod().needResponseBody())
+				response.end();
+			else
+				response.endWithoutBody();
+		} catch (HandlingEndException ignored) {
 		} catch (Throwable e) {
 			LOGGER.log(Level.SEVERE, "Uncatched error!", e);
 			request.logDebugInfo();
 			response.logDebugInfo();
 			throw new WebServerException("An error occured while handling a request.", e);
-		}
-
-		if (!response.isTerminated()) {
-			if (request.getMethod().needResponseBody())
-				response.setStatus(HttpStatus.NOT_FOUND).end();
-			else
-				response.setStatus(HttpStatus.NOT_FOUND).endWithoutBody();
 		}
 	}
 }

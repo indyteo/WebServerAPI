@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -32,6 +33,16 @@ public class MiscUtils {
 	@Contract(value = "!null, _ -> param1", pure = true)
 	public static <T> @Nullable T ifNullGet(@Nullable T value, @NotNull Supplier<T> nullDefault) {
 		return value == null ? nullDefault.get() : value;
+	}
+
+	@Contract(value = "null, _ -> null", pure = true)
+	public static <T, U> @Nullable U ifNotNull(@Nullable T value, @NotNull Function<T, U> function) {
+		return ifNotNull(value, function, null);
+	}
+
+	@Contract(value = "null, _, _ -> param3", pure = true)
+	public static <T, U> @Nullable U ifNotNull(@Nullable T value, @NotNull Function<T, U> function, @Nullable U nullDefault) {
+		return value == null ? nullDefault : function.apply(value);
 	}
 
 	@Contract(value = "null, _ -> param2; _, !null -> !null", pure = true)
