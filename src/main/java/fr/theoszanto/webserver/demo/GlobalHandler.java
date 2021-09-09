@@ -1,20 +1,21 @@
 package fr.theoszanto.webserver.demo;
 
+import fr.theoszanto.webserver.WebServer;
+import fr.theoszanto.webserver.api.FileResponse;
+import fr.theoszanto.webserver.api.HttpMIMEType;
+import fr.theoszanto.webserver.api.HttpRequest;
+import fr.theoszanto.webserver.api.HttpResponse;
+import fr.theoszanto.webserver.api.HttpStatus;
+import fr.theoszanto.webserver.handling.HandlersContainer;
+import fr.theoszanto.webserver.handling.HttpMethodHandler;
+import org.jetbrains.annotations.NotNull;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import fr.theoszanto.webserver.WebServer;
-import fr.theoszanto.webserver.api.HttpMIMEType;
-import fr.theoszanto.webserver.api.HttpRequest;
-import fr.theoszanto.webserver.api.HttpResponse;
-import fr.theoszanto.webserver.api.HttpStatus;
-import fr.theoszanto.webserver.handler.HandlersContainer;
-import fr.theoszanto.webserver.handler.HttpMethodHandler;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * A global handler, which handle a basic server serving
@@ -65,7 +66,7 @@ public class GlobalHandler implements HandlersContainer {
 			if (requestURI.toString().endsWith("/"))
 				f = Paths.get(f.getCanonicalPath(), "index.html").toFile();
 			else {
-				response.redirect(requestURI.toString() + "/");
+				response.redirect(requestURI + "/");
 				LOGGER.fine("Redirecting request on correct syntax route!");
 				return;
 			}
@@ -73,7 +74,7 @@ public class GlobalHandler implements HandlersContainer {
 		LOGGER.fine("Request file: " + f.getCanonicalPath());
 		HttpMIMEType mime = HttpMIMEType.fromExtension(f);
 		if (mime != null) {
-			response.sendFile(new HttpResponse.FileResponseBuilder(response)
+			response.sendFile(new FileResponse.Builder(response)
 					.setFile(f)
 					.setType(mime)
 					.build());

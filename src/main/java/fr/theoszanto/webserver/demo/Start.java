@@ -1,9 +1,12 @@
 package fr.theoszanto.webserver.demo;
 
 import fr.theoszanto.webserver.WebServer;
+import fr.theoszanto.webserver.api.Cookie;
 import fr.theoszanto.webserver.api.HtmlTemplate;
-import fr.theoszanto.webserver.handler.IntermediateHandler;
+import fr.theoszanto.webserver.api.Session;
+import fr.theoszanto.webserver.handling.IntermediateHandler;
 import fr.theoszanto.webserver.routing.RouteBuilder;
+import fr.theoszanto.webserver.utils.JsonUtils;
 
 import java.util.Scanner;
 
@@ -14,19 +17,17 @@ import java.util.Scanner;
  */
 public class Start {
 	public static void main(String[] args) {
-		WebServer ws = new WebServer(8080, "./files");
+		WebServer ws = new WebServer(8080, "./files", "./sessions");
 		Scanner sc = new Scanner(System.in);
 
 		//GlobalHandler.enable(ws);
-		HtmlTemplate.loadTemplates(ws, "template");
-		ws.getRouter()
+		ws.loadTemplates("template").getRouter()
 				.registerRoute(new RouteBuilder()
 						.setName("Test")
 						.setRoute("/test/{type}")
 						//.setMethod(HttpMethod.GET)
 						.setHandler((request, response) -> {
 							String type = request.getRouteParam("type");
-							if (type == null) return;
 							switch (type) {
 							case "escape":
 								response.sendEscaped("<h1 title=\"Hey\">'Coucou' &copy;</h1>").end();
@@ -46,6 +47,41 @@ public class Start {
 										.placeholder("escaped", "Never shown")
 										.placeholder("with special {name}", 7));
 								break;
+							case "cookie":
+								response.cookie(new Cookie.Builder()
+										.setName("person")
+										.setValue("toto")
+										.setSameSite(Cookie.SameSitePolicy.LAX)
+										.setHttpOnly(true)
+										.build())
+										.cookie(new Cookie.Builder()
+										.setName("id")
+										.setValue("8")
+										.setSameSite(Cookie.SameSitePolicy.LAX)
+										.setHttpOnly(true)
+										.build())
+										.end();
+								break;
+							case "cookie-delete":
+								response.deleteCookie("id").end();
+								break;
+							case "session":
+								Session session = request.getSession();
+								if (session.isInit()) {
+									Person data = JsonUtils.GSON.fromJson(session.get("person"), Person.class);
+									System.out.println("Session data: " + data);
+								}
+								session.set("person", JsonUtils.GSON.toJson(new Person("Toto", 7)));
+								System.out.println("Session ID: " + session.getId());
+								response.end();
+								break;
+							case "session-destroy":
+								request.getSession().destroy();
+								response.end();
+								break;
+							case "session-regen":
+								request.getSession().regenerateId();
+								response.end();
 							}
 						})
 						.setStrict(true)
@@ -123,6 +159,14 @@ public class Start {
 
 		public void setAge(int age) {
 			this.age = age;
+		}
+
+		@Override
+		public String toString() {
+			return "Person{" +
+					"name='" + name + '\'' +
+					", age=" + age +
+					'}';
 		}
 	}
 }

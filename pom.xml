@@ -11,26 +11,26 @@
 	<description>High level API to create web server in Java</description>
 	<url>https://theoszanto.fr/projets/?p=9</url>
 
+	<properties>
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+	</properties>
+
 	<dependencies>
 		<dependency>
 			<groupId>org.jetbrains</groupId>
 			<artifactId>annotations</artifactId>
-			<version>20.1.0</version>
+			<version>22.0.0</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.google.code.gson</groupId>
 			<artifactId>gson</artifactId>
-			<version>2.8.6</version>
+			<version>2.8.7</version>
 		</dependency>
 	</dependencies>
-
-	<properties>
-		<maven.compiler.source>11</maven.compiler.source>
-		<maven.compiler.target>11</maven.compiler.target>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-	</properties>
 
 	<build>
 		<plugins>
@@ -38,11 +38,6 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-jar-plugin</artifactId>
 				<version>3.2.0</version>
-				<configuration>
-					<archive>
-						<manifestFile>src/main/resources/META-INF/MANIFEST.MF</manifestFile>
-					</archive>
-				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -70,7 +65,7 @@
 					</execution>
 				</executions>
 				<configuration>
-					<javadocExecutable>${java.home}/bin/</javadocExecutable>
+					<javadocExecutable>${java.home}/../bin/</javadocExecutable>
 				</configuration>
 			</plugin>
 		</plugins>

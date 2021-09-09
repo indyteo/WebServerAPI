@@ -1,4 +1,8 @@
-package fr.theoszanto.webserver.handler;
+package fr.theoszanto.webserver.handling;
+
+import fr.theoszanto.webserver.api.HttpMethod;
+import fr.theoszanto.webserver.routing.Router;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -6,10 +10,6 @@ import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-
-import fr.theoszanto.webserver.api.HttpMethod;
-import fr.theoszanto.webserver.routing.Router;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Annotation used to mark methods from
@@ -66,6 +66,14 @@ public @interface HttpMethodHandler {
 	 *          match the requested path, {@code false} otherwise.
 	 */
 	boolean strict() default false;
+
+	/**
+	 * Whether the handler is intermediate or not.
+	 *
+	 * @return  {@code true} if the handler is intermediate,
+	 *          {@code false} otherwise.
+	 */
+	boolean intermediate() default false;
 
 	/**
 	 * Repeatable annotation container

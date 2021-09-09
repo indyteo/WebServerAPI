@@ -42,18 +42,18 @@ public abstract class BaseRoute {
 
 		String escapedRoute = routeEscape.matcher(route).replaceAll("\\\\$0");
 		Matcher paramsMatcher = paramsPattern.matcher(escapedRoute);
-		StringBuilder regexBuilder = new StringBuilder("^");
+		StringBuffer regexBuffer = new StringBuffer("^");
 		while (paramsMatcher.find()) {
 			this.groups.add(paramsMatcher.group("name"));
 			boolean full = "\\{".equals(paramsMatcher.group("d1")) && "\\}".equals(paramsMatcher.group("d2"));
-			paramsMatcher.appendReplacement(regexBuilder, "(?<${name}>" + (full ? "." : "[^/]") + "+)");
+			paramsMatcher.appendReplacement(regexBuffer, "(?<${name}>" + (full ? "." : "[^/]") + "+)");
 		}
-		paramsMatcher.appendTail(regexBuilder);
+		paramsMatcher.appendTail(regexBuffer);
 		if (strict)
-			regexBuilder.append("$");
-		else if (regexBuilder.charAt(regexBuilder.length() - 1) != '/')
-			regexBuilder.append("(?:/|$)");
-		String regex = regexBuilder.toString();
+			regexBuffer.append("$");
+		else if (regexBuffer.charAt(regexBuffer.length() - 1) != '/')
+			regexBuffer.append("(?:/|$)");
+		String regex = regexBuffer.toString();
 		this.internalPattern = Pattern.compile(paramEscape.matcher(regex).replaceAll("\\\\{$1"), Pattern.CASE_INSENSITIVE);
 		this.strippedRoute = paramsMatcher.replaceAll("{}");
 	}

@@ -3,6 +3,7 @@ package fr.theoszanto.webserver.api;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import fr.theoszanto.webserver.WebServer;
+import fr.theoszanto.webserver.routing.BaseRoute;
 import fr.theoszanto.webserver.utils.Checks;
 import fr.theoszanto.webserver.utils.JsonUtils;
 import fr.theoszanto.webserver.utils.MiscUtils;
@@ -51,6 +52,13 @@ public final class HttpRequest {
 	private final @NotNull HttpExchange exchange;
 
 	/**
+	 * The request context.
+	 *
+	 * @see		HttpRequest#getContext()
+	 */
+	private final @NotNull RequestContext context;
+
+	/**
 	 * The request headers.
 	 *
 	 * @see		HttpRequest#getHeaders()
@@ -69,8 +77,17 @@ public final class HttpRequest {
 
 	/**
 	 * The JSON parsed body of the request.
+	 *
+	 * @see		HttpRequest#getJsonParams()
 	 */
 	private final @Nullable Object jsonParams;
+
+	/**
+	 * The requested route that triggered the handler.
+	 *
+	 * @see		HttpRequest#getRoute()
+	 */
+	private @Nullable BaseRoute route;
 
 	/**
 	 * The parameters of the requested route, if any.
@@ -78,6 +95,15 @@ public final class HttpRequest {
 	 * @see		HttpRequest#getRouteParams()
 	 */
 	private @Nullable Map<String, String> routeParams;
+
+	/**
+	 * The cookies sent in the request.
+	 *
+	 * @see		HttpRequest#getCookies()
+	 */
+	private final @NotNull Map<String, String> cookies;
+
+	private @Nullable Session session;
 
 	/**
 	 * Construct a new request from the client.
@@ -102,16 +128,20 @@ public final class HttpRequest {
 	 * 			The WebServer to bind this request to.
 	 * @param exchange
 	 * 			The exchange of the request.
+	 * @param context
+	 * 			The context associated with the request.
 	 * @throws IOException
 	 * 			If an I/O exception occurs during the body-reading
 	 * 			process.
 	 */
-	public HttpRequest(@NotNull WebServer server, @NotNull HttpExchange exchange) throws IOException {
+	public HttpRequest(@NotNull WebServer server, @NotNull HttpExchange exchange, @NotNull RequestContext context) throws IOException {
 		Checks.notNull(server, "server");
 		Checks.notNull(exchange, "exchange");
 		this.server = server;
 		this.exchange = exchange;
+		this.context = context;
 		this.headers = exchange.getRequestHeaders();
+		this.cookies = new HashMap<>();
 
 		InputStream is = exchange.getRequestBody();
 		StringBuilder paramsReader = new StringBuilder();
@@ -137,19 +167,57 @@ public final class HttpRequest {
 			this.params = null;
 			this.jsonParams = null;
 		}
+
+		String cookieHeader = this.header("Cookie");
+		if (cookieHeader != null) {
+			String[] cookies = cookieHeader.trim().split(" *; *");
+			for (String cookie : cookies) {
+				String[] val = cookie.split("=");
+				try {
+					this.cookies.put(val[0], val[1]);
+				} catch (ArrayIndexOutOfBoundsException ignored) {}
+			}
+		}
+	}
+
+	public @NotNull RequestContext getContext() {
+		return this.context;
+	}
+
+	void setSession(@NotNull Session session) {
+		Checks.notNull(session, "session");
+		this.session = session;
+	}
+
+	@Contract(pure = true)
+	public @NotNull Session getSession() {
+		Checks.notNull(this.session, "session");
+		return this.session;
 	}
 
 	/**
-	 * The method parse the String {@code params} which contains
-	 * HTTP request parameters, formatted as the standard or JSON.
+	 * Set the current route.
 	 *
-	 *
-	 * 
-	 * @param params
-	 * 			The String representation of the params
+	 * @param route
+	 * 			The route that triggered the handler.
 	 */
 	@Contract(mutates = "this")
-	private void parseParams(@Nullable String params) {}
+	public void setRoute(@NotNull BaseRoute route) {
+		Checks.notNull(route, "route");
+		this.route = route;
+		this.routeParams = route.params(this.getURI().getPath());
+	}
+
+	/**
+	 * Get the current route.
+	 *
+	 * @return	The route that triggered the handler.
+	 */
+	@Contract(pure = true)
+	public @NotNull BaseRoute getRoute() {
+		Checks.notNull(this.route, "route");
+		return this.route;
+	}
 
 	/**
 	 * Set the current route parameters.
@@ -183,10 +251,34 @@ public final class HttpRequest {
 	 * 			key if it exists, {@code null} otherwise.
 	 * @see		HttpRequest#getParams()
 	 */
-	@Contract(pure = true)
-	public @Nullable String getParam(@NotNull String key) {
+	public @Nullable String getOptionalParam(@NotNull String key) {
 		Checks.notNull(key, "key");
 		return MiscUtils.ifNotNull(this.params, params -> params.get(key));
+	}
+
+	/**
+	 * Return the value of the given request param.
+	 *
+	 * @param key
+	 * 			The name of the request param to retrieve.
+	 * @return	The request param value corresponding to the
+	 * 			key.
+	 * @throws IllegalStateException
+	 * 			If the request has no params.
+	 * @throws IllegalArgumentException
+	 * 			If the request param was not found.
+	 * @see		HttpRequest#getParams()
+	 * @see		HttpRequest#getOptionalParam(String)
+	 */
+	@Contract(pure = true)
+	public @NotNull String getParam(@NotNull String key) {
+		Checks.notNull(key, "key");
+		if (this.params == null)
+			throw new IllegalStateException("Cannot find request params");
+		String param = this.params.get(key);
+		if (param == null)
+			throw new IllegalArgumentException("Cannot find request param with key " + key);
+		return param;
 	}
 
 	/**
@@ -221,9 +313,61 @@ public final class HttpRequest {
 	 * @see		HttpRequest#getRouteParams()
 	 */
 	@Contract(pure = true)
-	public @Nullable String getRouteParam(@NotNull String key) {
+	public @Nullable String getOptionalRouteParam(@NotNull String key) {
 		Checks.notNull(key, "key");
 		return MiscUtils.get(this.routeParams, key);
+	}
+
+	/**
+	 * Return the value of the given route param.
+	 *
+	 * @param key
+	 * 			The name of the route param to retrieve.
+	 * @return	The route param value corresponding to the
+	 * 			key.
+	 * @throws IllegalStateException
+	 * 			If the request has no route params.
+	 * @throws IllegalArgumentException
+	 * 			If the route param was not found.
+	 * @see		HttpRequest#getRouteParams()
+	 * @see		HttpRequest#getOptionalRouteParam(String)
+	 */
+	@Contract(pure = true)
+	public @NotNull String getRouteParam(@NotNull String key) {
+		Checks.notNull(key, "key");
+		if (this.routeParams == null)
+			throw new IllegalStateException("Cannot find route params");
+		String param = this.routeParams.get(key);
+		if (param == null)
+			throw new IllegalArgumentException("Cannot find route param with key " + key);
+		return param;
+	}
+
+	/**
+	 * Return the request cookies.
+	 *
+	 * @return	The request cookies.
+	 * @see		HttpRequest#cookies
+	 */
+	@UnmodifiableView
+	@Contract(value = " -> new", pure = true)
+	public @NotNull Map<String, String> getCookies() {
+		return Collections.unmodifiableMap(this.cookies);
+	}
+
+	/**
+	 * Return the value of the given cookie.
+	 *
+	 * @param name
+	 * 			The name of the cookie to retrieve.
+	 * @return	The cookie value corresponding to the
+	 * 			name if it exists, {@code null} otherwise.
+	 * @see		HttpRequest#getCookies()
+	 */
+	@Contract(pure = true)
+	public @Nullable String getCookie(@NotNull String name) {
+		Checks.notNull(name, "name");
+		return this.cookies.get(name);
 	}
 
 	/**
@@ -237,6 +381,17 @@ public final class HttpRequest {
 	}
 
 	/**
+	 * Return the request origin ({@code schem://host:port}).
+	 *
+	 * @return	The origin of the request.
+	 */
+	@Contract(pure = true)
+	public @NotNull String getOrigin() {
+		URI uri = this.getURI();
+		return uri.getScheme() + "://" + uri.getHost() + ":" + uri.getPort();
+	}
+
+	/**
 	 * Return the {@link File} object corresponding to the
 	 * requested URI and the server root.
 	 * 
@@ -245,7 +400,54 @@ public final class HttpRequest {
 	 */
 	@Contract(value = " -> new", pure = true)
 	public @NotNull File getRequestedFile() {
-		return Paths.get(this.server.getRoot(), this.getURI().toString()).toFile();
+		return this.getRequestedFile("", false);
+	}
+
+	/**
+	 * Return the {@link File} object corresponding to the
+	 * requested URI and the server root.
+	 *
+	 * @param trimRoute
+	 * 			Whether to remove the route prefix or not.
+	 * @return	The File requested by the client, that might
+	 * 			not exist.
+	 */
+	@Contract(value = "_ -> new", pure = true)
+	public @NotNull File getRequestedFile(boolean trimRoute) {
+		return this.getRequestedFile("", trimRoute);
+	}
+
+	/**
+	 * Return the {@link File} object corresponding to the
+	 * requested URI and the server root.
+	 *
+	 * @param folder
+	 * 			The sub-root folder to consider.
+	 * @return	The File requested by the client, that might
+	 * 			not exist.
+	 */
+	@Contract(value = "_ -> new", pure = true)
+	public @NotNull File getRequestedFile(@NotNull String folder) {
+		return this.getRequestedFile(folder, false);
+	}
+
+	/**
+	 * Return the {@link File} object corresponding to the
+	 * requested URI and the server root.
+	 *
+	 * @param folder
+	 * 			The sub-root folder to consider.
+	 * @param trimRoute
+	 * 			Whether to remove the route prefix or not.
+	 * @return	The File requested by the client, that might
+	 * 			not exist.
+	 */
+	@Contract(value = "_, _ -> new", pure = true)
+	public @NotNull File getRequestedFile(@NotNull String folder, boolean trimRoute) {
+		String file = this.getURI().toString();
+		if (trimRoute)
+			file = file.replaceFirst("^" + this.getRoute().getRoute(), "");
+		return Paths.get(this.server.getRoot(), folder, file).toFile();
 	}
 
 	/**

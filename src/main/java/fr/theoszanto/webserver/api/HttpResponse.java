@@ -3,7 +3,7 @@ package fr.theoszanto.webserver.api;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import fr.theoszanto.webserver.WebServer;
-import fr.theoszanto.webserver.handler.HandlingEndException;
+import fr.theoszanto.webserver.handling.HandlingEndException;
 import fr.theoszanto.webserver.utils.Checks;
 import fr.theoszanto.webserver.utils.JsonUtils;
 import fr.theoszanto.webserver.utils.MiscUtils;
@@ -11,13 +11,13 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
-import java.nio.file.Paths;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -47,6 +47,10 @@ public final class HttpResponse {
 	 */
 	private final @NotNull HttpExchange exchange;
 
+	private final @NotNull Headers headers;
+
+	private final @NotNull Set<@NotNull Cookie> cookies;
+
 	/**
 	 * The response that will be send to the client before
 	 * ending handling with {@link HttpResponse#end()}.
@@ -71,6 +75,8 @@ public final class HttpResponse {
 		Checks.notNull(exchange, "exchange");
 		this.server = server;
 		this.exchange = exchange;
+		this.headers = exchange.getResponseHeaders();
+		this.cookies = new HashSet<>();
 		this.header("Content-type", HttpMIMEType.HTML.getMime());
 	}
 
@@ -82,7 +88,7 @@ public final class HttpResponse {
 	 */
 	@Contract(pure = true)
 	public @NotNull Headers getHeaders() {
-		return exchange.getResponseHeaders();
+		return this.headers;
 	}
 
 	/**
@@ -102,10 +108,18 @@ public final class HttpResponse {
 		Checks.notEmpty(name, "name");
 		Checks.notEmpty(value, "value");
 		Checks.notNull(moreValues, "moreValues");
-		Headers headers = this.getHeaders();
-		headers.set(name, value);
+		this.headers.set(name, value);
 		for (String moreValue : moreValues)
-			headers.add(name, moreValue);
+			this.headers.add(name, moreValue);
+		return this;
+	}
+
+	@Contract(value = "_, _ -> this", mutates = "this")
+	public @NotNull HttpResponse headerAppend(@NotNull String name, @NotNull String... values) {
+		Checks.notEmpty(name, "name");
+		Checks.notEmpty(values, "values");
+		for (String value : values)
+			this.headers.add(name, value);
 		return this;
 	}
 
@@ -126,7 +140,7 @@ public final class HttpResponse {
 	@Contract(value = "_ -> this", mutates = "this")
 	public @NotNull HttpResponse send(@Nullable Object response) {
 		if (response != null)
-			this.response.append(response.toString());
+			this.response.append(response);
 		return this;
 	}
 
@@ -242,6 +256,19 @@ public final class HttpResponse {
 		return this.header("Content-type", type.getMime());
 	}
 
+	@Contract(value = "_ -> this", mutates = "this")
+	public @NotNull HttpResponse cookie(Cookie cookie) {
+		if (this.cookies.remove(cookie))
+			LOGGER.warning("Overriding previously set cookie with " + cookie);
+		this.cookies.add(cookie);
+		return this;
+	}
+
+	@Contract(value = "_ -> this", mutates = "this")
+	public @NotNull HttpResponse deleteCookie(String name) {
+		return this.cookie(new Cookie.Builder().setName(name).setMaxAge(0).setSameSite(Cookie.SameSitePolicy.LAX).build());
+	}
+
 	/**
 	 * End the handling by sending the specified file.
 	 *
@@ -264,14 +291,14 @@ public final class HttpResponse {
 	 * @throws IOException
 	 * 			If an I/O exception occurs, for example, if the
 	 * 			response was already send.
-	 * @see		HttpResponse.FileResponse
+	 * @see		FileResponse
 	 */
 	@Contract(value = "_ -> fail", mutates = "this")
 	public void sendFile(@NotNull FileResponse fileResponse) throws IOException {
 		Checks.notNull(fileResponse, "file");
 
 		// Verify the file exists
-		if (!fileResponse.file.exists() || !fileResponse.file.isFile()) {
+		if (!fileResponse.getFile().exists() || !fileResponse.getFile().isFile()) {
 			this.setStatus(HttpStatus.NOT_FOUND).end();
 			return;
 		}
@@ -281,9 +308,9 @@ public final class HttpResponse {
 			this.status = HttpStatus.OK;
 
 		// Retrieve the MIME type and deny access if unknown extension
-		HttpMIMEType mime = MiscUtils.ifNullGet(fileResponse.type, () -> HttpMIMEType.fromExtension(fileResponse.file));
+		HttpMIMEType mime = MiscUtils.ifNullGet(fileResponse.getType(), () -> HttpMIMEType.fromExtension(fileResponse.getFile()));
 		if (mime == null) {
-			if (fileResponse.unsafe)
+			if (fileResponse.isUnsafe())
 				mime = HttpMIMEType.DEFAULT;
 			else {
 				this.setStatus(HttpStatus.FORBIDDEN).end();
@@ -294,13 +321,13 @@ public final class HttpResponse {
 		this.contentType(mime);
 
 		// Add Content-disposition if needed to download
-		if (fileResponse.download)
-			this.header("Content-disposition", "attachment; filename=\"" + fileResponse.file.getName() + "\"");
+		if (fileResponse.isDownload())
+			this.header("Content-disposition", "attachment; filename=\"" + fileResponse.getFile().getName() + "\"");
 
 		try {
 			// Send file in response to client
 			this.exchange.sendResponseHeaders(this.status.getCode(), 0);
-			FileInputStream fs = new FileInputStream(fileResponse.file);
+			FileInputStream fs = new FileInputStream(fileResponse.getFile());
 			OutputStream responseBody = this.exchange.getResponseBody();
 			int byteRead;
 			while ((byteRead = fs.read()) != -1)
@@ -312,184 +339,6 @@ public final class HttpResponse {
 		} catch (FileNotFoundException e) {
 			// Or a 404 Not Found error
 			this.setStatus(HttpStatus.NOT_FOUND).contentType(HttpMIMEType.HTML).end();
-		}
-	}
-
-	/**
-	 * Represent a file as a response to client.
-	 *
-	 * @see		HttpResponse#sendFile(FileResponse)
-	 * @see		HttpResponse.FileResponseBuilder
-	 */
-	public static class FileResponse {
-		/**
-		 * The file to send to the client.
-		 */
-		private final @NotNull File file;
-		/**
-		 * Whether or not the file should be downloaded by
-		 * the client.
-		 */
-		private final boolean download;
-		/**
-		 * Whether to allow unsafe (unknown) file extensions
-		 * to be sent to the client or not.
-		 */
-		private final boolean unsafe;
-		/**
-		 * The MIME type to force. Otherwise, MIME is
-		 * {@link HttpMIMEType#fromExtension(File) retrieved from the extension}.
-		 */
-		private final @Nullable HttpMIMEType type;
-
-		/**
-		 * Create a new file response object.
-		 *
-		 * @param file
-		 * 			The file to send to the client.
-		 * @param download
-		 * 			Whether or not the file should be downloaded by
-		 * 			the client.
-		 * @param unsafe
-		 * 			Whether to allow unsafe (unknown) file extensions
-		 * 			to be sent to the client or not.
-		 * @param type
-		 * 			The MIME type to force. Otherwise, MIME is
-		 * 			{@link HttpMIMEType#fromExtension(File) retrieved from the extension}.
-		 * @see		HttpResponse.FileResponseBuilder
-		 */
-		public FileResponse(@NotNull File file, boolean download, boolean unsafe, @Nullable HttpMIMEType type) {
-			Checks.notNull(file, "file");
-			this.file = file;
-			this.download = download;
-			this.unsafe = unsafe;
-			this.type = type;
-		}
-	}
-
-	/**
-	 * Builder to create {@link FileResponse file response}
-	 */
-	public static class FileResponseBuilder {
-		/**
-		 * Response for which the file response will be created.
-		 */
-		private final @NotNull HttpResponse response;
-
-		/**
-		 * The file to send to the client.
-		 */
-		private @Nullable File file = null;
-		/**
-		 * Whether or not the file should be downloaded by
-		 * the client.
-		 */
-		private boolean download = false;
-		/**
-		 * Whether to allow unsafe (unknown) file extensions
-		 * to be sent to the client or not.
-		 */
-		private boolean unsafe = false;
-		/**
-		 * The MIME type to force. Otherwise, MIME is
-		 * {@link HttpMIMEType#fromExtension(File) retrieved from the extension}.
-		 */
-		private @Nullable HttpMIMEType type = null;
-
-		/**
-		 * Create a new builder bound to the given response.
-		 *
-		 * @param response
-		 * 			Response for which the file response
-		 * 			will be created.
-		 */
-		public FileResponseBuilder(@NotNull HttpResponse response) {
-			this.response = response;
-		}
-
-		/**
-		 * Create a new file response using the builder's
-		 * current properties.
-		 *
-		 * @return	A new file response from the current state.
-		 */
-		@Contract(value = " -> new", pure = true)
-		public @NotNull FileResponse build() {
-			Checks.notNull(this.file, "file");
-			return new FileResponse(this.file, this.download, this.unsafe, this.type);
-		}
-
-		/**
-		 * Set the file to send to the client.
-		 *
-		 * @param file
-		 * 			The file to send to the client.
-		 * @return	Itself, to allow chained calls.
-		 */
-		@Contract(value = "_ -> this", mutates = "this")
-		public @NotNull FileResponseBuilder setFile(@NotNull File file) {
-			Checks.notNull(file, "file");
-			this.file = file;
-			return this;
-		}
-
-		/**
-		 * Set the file to send to the client from the given
-		 * path.
-		 *
-		 * @param path
-		 * 			The path of the file to send to the client.
-		 * @return	Itself, to allow chained calls.
-		 */
-		@Contract(value = "_ -> this", mutates = "this")
-		public @NotNull FileResponseBuilder setFile(@NotNull String path) {
-			Checks.notNull(path, "path");
-			this.file = Paths.get(this.response.server.getRoot(), path).toFile();
-			return this;
-		}
-
-		/**
-		 * Set whether or not the file should be downloaded
-		 * by the client.
-		 *
-		 * @param download
-		 * 			Whether or not the file should be downloaded by
-		 * 			the client.
-		 * @return	Itself, to allow chained calls.
-		 */
-		@Contract(value = "_ -> this", mutates = "this")
-		public @NotNull FileResponseBuilder setDownload(boolean download) {
-			this.download = download;
-			return this;
-		}
-
-		/**
-		 * Set whether to allow unsafe (unknown) file extensions
-		 * to be sent to the client or not.
-		 *
-		 * @param unsafe
-		 * 			Whether to allow unsafe (unknown) file extensions
-		 * 			to be sent to the client or not.
-		 * @return	Itself, to allow chained calls.
-		 */
-		@Contract(value = "_ -> this", mutates = "this")
-		public @NotNull FileResponseBuilder setUnsafe(boolean unsafe) {
-			this.unsafe = unsafe;
-			return this;
-		}
-
-		/**
-		 * Set the MIME type to force. If not set, the MIME is
-		 * {@link HttpMIMEType#fromExtension(File) retrieved from the extension}.
-		 *
-		 * @param type
-		 * 			The MIME type to force.
-		 * @return	Itself, to allow chained calls.
-		 */
-		@Contract(value = "_ -> this", mutates = "this")
-		public @NotNull FileResponseBuilder setType(@Nullable HttpMIMEType type) {
-			this.type = type;
-			return this;
 		}
 	}
 
@@ -530,6 +379,33 @@ public final class HttpResponse {
 		this.end();
 	}
 
+	private void setCookieHeaders() {
+		for (Cookie cookie : this.cookies)
+			this.headerAppend("Set-cookie", cookie.toString());
+	}
+
+	/**
+	 * End this handling by calling the appropriate ending method
+	 * according the the {@code withResponseBody} parameter.
+	 *
+	 * <p>This is a terminal operation.</p>
+	 *
+	 * @param withResponseBody
+	 * 			Whether to include response body or not.
+	 * @throws IOException
+	 * 			If an I/O exception occurs, for example, if the
+	 * 			response was already send.
+	 * @see		HttpResponse#end()
+	 * @see		HttpResponse#endWithoutBody()
+	 */
+	@Contract(value = "_ -> fail", mutates = "this")
+	public void end(boolean withResponseBody) throws IOException {
+		if (withResponseBody)
+			this.end();
+		else
+			this.endWithoutBody();
+	}
+
 	/**
 	 * End this handling.
 	 * 
@@ -552,6 +428,7 @@ public final class HttpResponse {
 			this.status = HttpStatus.OK;
 		if (this.response.length() == 0)
 			this.send("<h1>" + this.status.getStatus() + "</h1>");
+		this.setCookieHeaders();
 
 		byte[] responseByte = this.response.toString().getBytes();
 		this.exchange.sendResponseHeaders(this.status.getCode(), responseByte.length);
@@ -579,8 +456,13 @@ public final class HttpResponse {
 	public void endWithoutBody() throws IOException {
 		if (this.status == null)
 			this.status = HttpStatus.NO_CONTENT;
+		this.setCookieHeaders();
 		this.exchange.sendResponseHeaders(status.getCode(), -1);
 		throw new HandlingEndException();
+	}
+
+	public @NotNull WebServer getServer() {
+		return this.server;
 	}
 
 	/**

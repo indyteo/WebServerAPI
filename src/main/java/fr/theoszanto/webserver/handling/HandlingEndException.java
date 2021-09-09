@@ -1,3 +1,3 @@
-package fr.theoszanto.webserver.handler;
+package fr.theoszanto.webserver.handling;
 
 public class HandlingEndException extends RuntimeException {}

@@ -1,11 +1,10 @@
 package fr.theoszanto.webserver.routing;
 
-import fr.theoszanto.webserver.handler.HandlersContainer;
 import fr.theoszanto.webserver.api.HttpMethod;
-import fr.theoszanto.webserver.handler.HandlingEndException;
-import fr.theoszanto.webserver.handler.IntermediateHandler;
-import fr.theoszanto.webserver.handler.IntermediateHandlersContainer;
-import fr.theoszanto.webserver.handler.RequestHandler;
+import fr.theoszanto.webserver.handling.HandlersContainer;
+import fr.theoszanto.webserver.handling.HandlingEndException;
+import fr.theoszanto.webserver.handling.IntermediateHandler;
+import fr.theoszanto.webserver.handling.RequestHandler;
 import fr.theoszanto.webserver.utils.Checks;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -73,8 +72,8 @@ public class RouteBuilder {
 	}
 
 	@Contract(value = "_, _ -> this", mutates = "this")
-	public @NotNull RouteBuilder setIntermediateHandler(@NotNull Method handler, @Nullable IntermediateHandlersContainer container) {
-		this.intermediateHandler = handlerMethod(handler, container);
+	public @NotNull RouteBuilder setIntermediateHandler(@NotNull Method handler, @Nullable HandlersContainer container) {
+		this.intermediateHandler = intermediateHandlerMethod(handler, container);
 		if (this.name == null)
 			this.name = handler.getName();
 		return this;
@@ -108,7 +107,7 @@ public class RouteBuilder {
 	}
 
 	@Contract("_, _ -> new")
-	public static @NotNull IntermediateHandler handlerMethod(@NotNull Method handler, @Nullable IntermediateHandlersContainer container) {
+	public static @NotNull IntermediateHandler intermediateHandlerMethod(@NotNull Method handler, @Nullable HandlersContainer container) {
 		Checks.validIntermediateHandlerMethod(handler, container);
 		handler.setAccessible(true);
 		return (request, response) -> {

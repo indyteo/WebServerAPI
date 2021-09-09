@@ -1,5 +1,7 @@
-package fr.theoszanto.webserver.handler;
+package fr.theoszanto.webserver.handling;
 
+import fr.theoszanto.webserver.api.FileResponse;
+import fr.theoszanto.webserver.api.HttpMIMEType;
 import fr.theoszanto.webserver.api.HttpRequest;
 import fr.theoszanto.webserver.api.HttpResponse;
 import fr.theoszanto.webserver.api.HttpStatus;
@@ -8,7 +10,10 @@ import fr.theoszanto.webserver.routing.Router;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.nio.file.Paths;
 
 /**
  * An intermediate handler for client requests that can be
@@ -59,6 +64,41 @@ public interface IntermediateHandler {
 				return false;
 			};
 		}
+	}
+
+	@NotNull String @NotNull[] indexes = { "index.html", "index.js", "index.css" };
+
+	static @NotNull IntermediateHandler staticServe(@NotNull String path) {
+		return (request, response) -> {
+			File f = request.getRequestedFile(path, true);
+			if (f.isDirectory()) {
+				URI requestURI = request.getURI();
+				if (requestURI.toString().endsWith("/")) {
+					boolean searchIndex = true;
+					for (int i = 0; searchIndex && i < indexes.length; i++) {
+						f = Paths.get(f.getCanonicalPath(), indexes[i]).toFile();
+						if (f.isFile())
+							searchIndex = false;
+					}
+					// If still searching, then not found, continue
+					if (searchIndex)
+						return true;
+				}
+				else {
+					response.redirect(requestURI + "/");
+					return false;
+				}
+			}
+			HttpMIMEType mime = HttpMIMEType.fromExtension(f);
+			if (mime != null) {
+				response.sendFile(new FileResponse.Builder(response)
+						.setFile(f)
+						.setType(mime)
+						.build());
+				return false;
+			}
+			return true;
+		};
 	}
 
 	/**

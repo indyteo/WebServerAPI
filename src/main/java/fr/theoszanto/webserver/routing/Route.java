@@ -1,7 +1,7 @@
 package fr.theoszanto.webserver.routing;
 
 import fr.theoszanto.webserver.api.HttpMethod;
-import fr.theoszanto.webserver.handler.RequestHandler;
+import fr.theoszanto.webserver.handling.RequestHandler;
 import fr.theoszanto.webserver.utils.Checks;
 import fr.theoszanto.webserver.utils.MiscUtils;
 import org.jetbrains.annotations.Contract;

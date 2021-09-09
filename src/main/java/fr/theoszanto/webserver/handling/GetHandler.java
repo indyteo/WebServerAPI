@@ -1,4 +1,8 @@
-package fr.theoszanto.webserver.handler;
+package fr.theoszanto.webserver.handling;
+
+import fr.theoszanto.webserver.api.HttpMethod;
+import fr.theoszanto.webserver.routing.Router;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -7,24 +11,20 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import fr.theoszanto.webserver.api.HttpMethod;
-import fr.theoszanto.webserver.routing.Router;
-import org.jetbrains.annotations.NotNull;
-
 /**
  * Shortcut annotation used to mark methods from
  * {@link HandlersContainer handlers containers} which
- * should handle {@link HttpMethod#POST POST requests}.
+ * should handle {@link HttpMethod#GET GET requests}.
  * 
  * @author	indyteo
  * @see		Router#registerHandlers(HandlersContainer)
- * @see		HttpMethod#POST
+ * @see		HttpMethod#GET
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-@Repeatable(PostHandler.Repeated.class)
-public @interface PostHandler {
+@Repeatable(GetHandler.Repeated.class)
+public @interface GetHandler {
 	/**
 	 * The base route defining which routes handle.
 	 * 
@@ -44,12 +44,20 @@ public @interface PostHandler {
 	boolean strict() default false;
 
 	/**
+	 * Whether the handler is intermediate or not.
+	 *
+	 * @return  {@code true} if the handler is intermediate,
+	 *          {@code false} otherwise.
+	 */
+	boolean intermediate() default false;
+
+	/**
 	 * Repeatable annotation container
 	 */
 	@Documented
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target(ElementType.METHOD)
 	@interface Repeated {
-		@NotNull PostHandler[] value();
+		@NotNull GetHandler[] value();
 	}
 }

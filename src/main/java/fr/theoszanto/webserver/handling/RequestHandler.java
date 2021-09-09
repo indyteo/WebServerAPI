@@ -1,4 +1,4 @@
-package fr.theoszanto.webserver.handler;
+package fr.theoszanto.webserver.handling;
 
 import fr.theoszanto.webserver.api.HttpRequest;
 import fr.theoszanto.webserver.api.HttpResponse;

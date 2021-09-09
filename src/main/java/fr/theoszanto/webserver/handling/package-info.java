@@ -3,4 +3,4 @@
  * 
  * @author	indyteo
  */
-package fr.theoszanto.webserver.handler;
+package fr.theoszanto.webserver.handling;

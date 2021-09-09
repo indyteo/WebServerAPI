@@ -1,25 +1,25 @@
 package fr.theoszanto.webserver;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import com.sun.net.httpserver.HttpServer;
-
-import fr.theoszanto.webserver.handler.Handler;
+import fr.theoszanto.webserver.api.HtmlTemplate;
 import fr.theoszanto.webserver.api.HttpMethod;
 import fr.theoszanto.webserver.api.HttpStatus;
-import fr.theoszanto.webserver.handler.HandlersContainer;
 import fr.theoszanto.webserver.api.WebServerException;
-import fr.theoszanto.webserver.handler.IntermediateHandler;
+import fr.theoszanto.webserver.handling.Handler;
+import fr.theoszanto.webserver.handling.HandlersContainer;
+import fr.theoszanto.webserver.handling.IntermediateHandler;
 import fr.theoszanto.webserver.routing.RouteBuilder;
 import fr.theoszanto.webserver.routing.Router;
 import fr.theoszanto.webserver.utils.Checks;
 import fr.theoszanto.webserver.utils.MiscUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * The web server class, managing the HTTP server.
@@ -55,6 +55,11 @@ public class WebServer {
 	private final @NotNull String root;
 
 	/**
+	 * The root directory of the clients sessions.
+	 */
+	private final @NotNull String sessionsDir;
+
+	/**
 	 * The super-handler for all requests.
 	 */
 	private final @NotNull Handler handler;
@@ -72,11 +77,14 @@ public class WebServer {
 	 * 			The port on which the server is listening.
 	 * @param root
 	 * 			The root of the server.
+	 * @param sessionsDir
+	 * 			The root directory of the clients sessions.
 	 */
-	public WebServer(int port, @NotNull String root) throws WebServerException {
+	public WebServer(int port, @NotNull String root, @NotNull String sessionsDir) throws WebServerException {
 		Checks.notNull(root, "root");
 		this.port = port;
 		this.root = root;
+		this.sessionsDir = sessionsDir;
 		this.router = new Router();
 
 		try {
@@ -89,6 +97,14 @@ public class WebServer {
 					LOGGER.info("Created \"" + this.root + "\" directory.");
 				else
 					throw new IOException("Unable to create the root directory \"" + this.root + "\".");
+			}
+			LOGGER.config("Sessions root directory: " + this.sessionsDir);
+			f = new File(this.sessionsDir);
+			if (!f.isDirectory()) {
+				if (f.mkdirs())
+					LOGGER.info("Created \"" + this.sessionsDir + "\" directory.");
+				else
+					throw new IOException("Unable to create the sessions root directory \"" + this.sessionsDir + "\".");
 			}
 
 			this.server = HttpServer.create(new InetSocketAddress(this.port), 0);
@@ -118,10 +134,10 @@ public class WebServer {
 	 * 
 	 * @param port
 	 * 			The port on which the server is listening.
-	 * @see		WebServer#WebServer(int, String)
+	 * @see		WebServer#WebServer(int, String, String)
 	 */
 	public WebServer(int port) {
-		this(port, System.getProperty("user.dir", ""));
+		this(port, System.getProperty("user.dir", ""), "./sessions");
 	}
 
 	/**
@@ -132,6 +148,7 @@ public class WebServer {
 	 * 
 	 * <p>Note: It's impossible to re-open a closed WebServer.</p>
 	 */
+	@Contract(mutates = "this")
 	public void close() {
 		this.close(0);
 	}
@@ -145,10 +162,24 @@ public class WebServer {
 	 * 			The maximum number of seconds to wait before closing
 	 * 			current handlers.
 	 */
+	@Contract(mutates = "this")
 	public void close(int maximumDelay) {
 		this.server.stop(maximumDelay);
 		this.running = false;
 		LOGGER.info("Server closed!");
+	}
+
+	/**
+	 * Load the given templates for the current server.
+	 *
+	 * @param templates
+	 * 			The templates to load.
+	 * @return	Itself, to allow chained calls.
+	 */
+	@Contract(value = "_ -> this", mutates = "this")
+	public WebServer loadTemplates(String... templates) {
+		HtmlTemplate.loadTemplates(this, templates);
+		return this;
 	}
 
 	/**
@@ -172,6 +203,16 @@ public class WebServer {
 	}
 
 	/**
+	 * Return the root directory of the clients sessions.
+	 *
+	 * @return	The root directory of the clients sessions.
+	 */
+	@Contract(pure = true)
+	public @NotNull String getSessionsDir() {
+		return this.sessionsDir;
+	}
+
+	/**
 	 * Return the port the current server is listening to.
 	 *
 	 * @return	The port the server is listening.
@@ -189,6 +230,17 @@ public class WebServer {
 	@Contract(pure = true)
 	public @NotNull Handler getHandler() {
 		return this.handler;
+	}
+
+	/**
+	 * Return the running status of the server.
+	 *
+	 * @return	The running status of the server.
+	 * @see		WebServer#close()
+	 */
+	@Contract(pure = true)
+	public boolean isRunning() {
+		return this.running;
 	}
 
 	/**

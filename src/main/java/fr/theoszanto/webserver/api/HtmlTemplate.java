@@ -46,7 +46,9 @@ public class HtmlTemplate {
 				if (c == '}') {
 					placeholder = false;
 					Object value = this.placeholders.get(name.toString());
-					if (value != null)
+					if (value instanceof HtmlTemplate)
+						((HtmlTemplate) value).send(sendTo);
+					else if (value != null)
 						sendTo.write(value.toString().getBytes());
 					name = new StringBuilder();
 				} else

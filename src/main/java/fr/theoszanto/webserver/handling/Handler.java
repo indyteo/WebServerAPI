@@ -1,4 +1,4 @@
-package fr.theoszanto.webserver.handler;
+package fr.theoszanto.webserver.handling;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -6,7 +6,8 @@ import fr.theoszanto.webserver.WebServer;
 import fr.theoszanto.webserver.api.HttpRequest;
 import fr.theoszanto.webserver.api.HttpResponse;
 import fr.theoszanto.webserver.api.HttpStatus;
-import fr.theoszanto.webserver.api.WebServerException;
+import fr.theoszanto.webserver.api.RequestContext;
+import fr.theoszanto.webserver.api.Session;
 import fr.theoszanto.webserver.routing.Router;
 import fr.theoszanto.webserver.utils.Checks;
 import org.jetbrains.annotations.NotNull;
@@ -58,13 +59,14 @@ public class Handler implements HttpHandler {
 	 * 			When an I/O exception is thrown by one of the
 	 * 			{@code HttpExchange}'s method.
 	 * @see		Router#registerHandlers(HandlersContainer)
-	 * @see		Router#registerIntermediateHandlers(IntermediateHandlersContainer)
 	 */
 	@Override
 	public final void handle(@NotNull HttpExchange exchange) throws IOException {
 		Checks.notNull(exchange, "exchange");
-		HttpRequest request = new HttpRequest(this.server, exchange);
+		RequestContext context = new RequestContext();
+		HttpRequest request = new HttpRequest(this.server, exchange, context);
 		HttpResponse response = new HttpResponse(this.server, exchange);
+		new Session(request, response);
 
 		try {
 			this.server.getRouter().handle(request, response);
@@ -72,16 +74,13 @@ public class Handler implements HttpHandler {
 			// Executed only if handler did not terminate
 			if (response.getStatus() == null)
 				response.setStatus(HttpStatus.NOT_FOUND);
-			if (request.getMethod().needResponseBody())
-				response.end();
-			else
-				response.endWithoutBody();
-		} catch (HandlingEndException ignored) {
+			response.end(request.getMethod().needResponseBody());
+		} catch (HandlingEndException ignored) { // Normal termination of the handler
 		} catch (Throwable e) {
-			LOGGER.log(Level.SEVERE, "Uncatched error!", e);
+			LOGGER.log(Level.SEVERE, "An error occured while handling a request", e);
 			request.logDebugInfo();
 			response.logDebugInfo();
-			throw new WebServerException("An error occured while handling a request.", e);
+			response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR).end(request.getMethod().needResponseBody());
 		}
 	}
 }

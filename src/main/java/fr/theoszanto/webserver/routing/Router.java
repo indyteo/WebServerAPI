@@ -1,13 +1,13 @@
 package fr.theoszanto.webserver.routing;
 
+import fr.theoszanto.webserver.api.HttpMethod;
 import fr.theoszanto.webserver.api.HttpRequest;
 import fr.theoszanto.webserver.api.HttpResponse;
-import fr.theoszanto.webserver.handler.GetHandler;
-import fr.theoszanto.webserver.handler.HandlersContainer;
-import fr.theoszanto.webserver.api.HttpMethod;
-import fr.theoszanto.webserver.handler.HttpMethodHandler;
-import fr.theoszanto.webserver.handler.IntermediateHandlersContainer;
-import fr.theoszanto.webserver.handler.PostHandler;
+import fr.theoszanto.webserver.handling.GetHandler;
+import fr.theoszanto.webserver.handling.HandlersContainer;
+import fr.theoszanto.webserver.handling.HandlingPrefix;
+import fr.theoszanto.webserver.handling.HttpMethodHandler;
+import fr.theoszanto.webserver.handling.PostHandler;
 import fr.theoszanto.webserver.utils.Checks;
 import fr.theoszanto.webserver.utils.MiscUtils;
 import org.jetbrains.annotations.Contract;
@@ -73,7 +73,24 @@ public class Router {
 	@Contract(value = "_ -> this", mutates = "this")
 	public @NotNull Router registerHandlers(@NotNull HandlersContainer handlers) {
 		Checks.notNull(handlers, "handlers");
-		return this.registerHandlers(handlers.getClass(), handlers);
+		return this.registerHandlers(handlers, handlingPrefix(handlers.getClass()));
+	}
+
+	/**
+	 * Register handlers contained in the HandlersContainer instance you
+	 * gave.
+	 *
+	 * @param handlers
+	 * 			The instance of the {@link HandlersContainer handlers container}
+	 * 			to register.
+	 * @param prefix
+	 * 			The route prefix for handlers.
+	 * @return	Itself, to allow chained calls.
+	 */
+	@Contract(value = "_, _ -> this", mutates = "this")
+	public @NotNull Router registerHandlers(@NotNull HandlersContainer handlers, @NotNull String prefix) {
+		Checks.notNull(handlers, "handlers");
+		return this.registerHandlers(handlers.getClass(), handlers, prefix);
 	}
 
 	/**
@@ -86,7 +103,22 @@ public class Router {
 	@Contract(value = "_ -> this", mutates = "this")
 	public @NotNull Router registerHandlers(@NotNull Class<? extends HandlersContainer> handlersClass) {
 		Checks.notNull(handlersClass, "handlersClass");
-		return this.registerHandlers(handlersClass, null);
+		return this.registerHandlers(handlersClass, handlingPrefix(handlersClass));
+	}
+
+	/**
+	 * Register static handlers contained in the HandlersContainer class.
+	 *
+	 * @param handlersClass
+	 * 			The class where the handlers are.
+	 * @param prefix
+	 * 			The route prefix for handlers.
+	 * @return	Itself, to allow chained calls.
+	 */
+	@Contract(value = "_, _ -> this", mutates = "this")
+	public @NotNull Router registerHandlers(@NotNull Class<? extends HandlersContainer> handlersClass, @NotNull String prefix) {
+		Checks.notNull(handlersClass, "handlersClass");
+		return this.registerHandlers(handlersClass, null, prefix);
 	}
 
 	/**
@@ -97,18 +129,25 @@ public class Router {
 	 * @param handlersContainer
 	 * 			The instance of the {@link HandlersContainer handlers container}
 	 * 			to register.
+	 * @param prefix
+	 * 			The route prefix for handlers.
 	 * @return	Itself, to allow chained calls.
 	 */
-	@Contract(value = "_, _ -> this", mutates = "this")
-	private @NotNull Router registerHandlers(@NotNull Class<? extends HandlersContainer> handlersClass, @Nullable HandlersContainer handlersContainer) {
+	@Contract(value = "_, _, _ -> this", mutates = "this")
+	private @NotNull Router registerHandlers(@NotNull Class<? extends HandlersContainer> handlersClass, @Nullable HandlersContainer handlersContainer, @NotNull String prefix) {
 		Checks.notNull(handlersClass, "handlersClass");
 		for (Method m : handlersClass.getDeclaredMethods()) {
 			if (m.isAnnotationPresent(GetHandler.class) || m.isAnnotationPresent(PostHandler.class) || m.isAnnotationPresent(HttpMethodHandler.class)) {
-				RouteBuilder builder = new RouteBuilder().setHandler(m, handlersContainer);
-				registerRoutesFromHandler(builder, m, () -> this.registerRoute(builder.buildRoute()));
+				RouteBuilder builder = new RouteBuilder();
+				this.registerRoutesFromHandler(builder, m, handlersContainer, prefix);
 			}
 		}
 		return this;
+	}
+
+	private static @NotNull String handlingPrefix(@NotNull Class<? extends HandlersContainer> handlersClass) {
+		HandlingPrefix prefix = handlersClass.getAnnotation(HandlingPrefix.class);
+		return prefix == null ? "" : prefix.value();
 	}
 
 	/**
@@ -134,56 +173,6 @@ public class Router {
 	}
 
 	/**
-	 * Register intermediate handlers contained in the
-	 * IntermediateHandlersContainer instance you gave.
-	 *
-	 * @param intermediateHandlers
-	 * 			The instance of the {@link IntermediateHandlersContainer intermediate handlers container}
-	 * 			to register.
-	 * @return	Itself, to allow chained calls.
-	 */
-	@Contract(value = "_ -> this", mutates = "this")
-	public @NotNull Router registerIntermediateHandlers(@NotNull IntermediateHandlersContainer intermediateHandlers) {
-		Checks.notNull(intermediateHandlers, "intermediateHandlers");
-		return this.registerIntermediateHandlers(intermediateHandlers.getClass(), intermediateHandlers);
-	}
-
-	/**
-	 * Register static intermediate handlers contained in the
-	 * IntermediateHandlersContainer class.
-	 *
-	 * @param intermediateHandlersClass
-	 * 			The class where the intermediate handlers are.
-	 * @return	Itself, to allow chained calls.
-	 */
-	@Contract(value = "_ -> this", mutates = "this")
-	public @NotNull Router registerIntermediateHandlers(@NotNull Class<? extends IntermediateHandlersContainer> intermediateHandlersClass) {
-		Checks.notNull(intermediateHandlersClass, "intermediateHandlersClass");
-		return this.registerIntermediateHandlers(intermediateHandlersClass, null);
-	}
-
-	/**
-	 * Register intermediate handlers contained in the
-	 * IntermediateHandlersContainer class.
-	 *
-	 * @param intermediateHandlersClass
-	 * 			The class where the handlers are.
-	 * @param intermediateHandlersContainer
-	 * 			The instance of the {@link IntermediateHandlersContainer intermediate handlers container}
-	 * 			to register.
-	 * @return	Itself, to allow chained calls.
-	 */
-	@Contract(value = "_, _ -> this", mutates = "this")
-	private @NotNull Router registerIntermediateHandlers(@NotNull Class<? extends IntermediateHandlersContainer> intermediateHandlersClass, @Nullable IntermediateHandlersContainer intermediateHandlersContainer) {
-		Checks.notNull(intermediateHandlersClass, "intermediateHandlersClass");
-		for (Method m : intermediateHandlersClass.getDeclaredMethods()) {
-			RouteBuilder builder = new RouteBuilder().setIntermediateHandler(m, intermediateHandlersContainer);
-			registerRoutesFromHandler(builder, m, () -> this.registerIntermediateRoute(builder.buildIntermediateRoute()));
-		}
-		return this;
-	}
-
-	/**
 	 * Register the given intermediate route.
 	 *
 	 * <p>Registered intermediate routes are called before
@@ -200,28 +189,30 @@ public class Router {
 		return this;
 	}
 
-	@Contract(mutates = "param1")
-	private static void registerRoutesFromHandler(@NotNull RouteBuilder builder, @NotNull Method method, @NotNull Runnable build) {
+	@Contract(mutates = "this, param1")
+	private void registerRoutesFromHandler(@NotNull RouteBuilder builder, @NotNull Method method, @Nullable HandlersContainer handlersContainer, @NotNull String prefix) {
 		GetHandler[] getHandlers = method.getAnnotationsByType(GetHandler.class);
-		for (GetHandler getHandler : getHandlers) {
-			builder.setRoute(getHandler.value()).setMethod(HttpMethod.GET).setStrict(getHandler.strict());
-			build.run();
-		}
+		for (GetHandler getHandler : getHandlers)
+			this.register(builder, method, handlersContainer, prefix + getHandler.value(), HttpMethod.GET, getHandler.strict(), getHandler.intermediate());
 
 		PostHandler[] postHandlers = method.getAnnotationsByType(PostHandler.class);
-		for (PostHandler postHandler : postHandlers) {
-			builder.setRoute(postHandler.value()).setMethod(HttpMethod.POST).setStrict(postHandler.strict());
-			build.run();
-		}
+		for (PostHandler postHandler : postHandlers)
+			this.register(builder, method, handlersContainer, prefix + postHandler.value(), HttpMethod.POST, postHandler.strict(), postHandler.intermediate());
 
 		HttpMethodHandler[] allHandlers = method.getAnnotationsByType(HttpMethodHandler.class);
-		for (HttpMethodHandler allHandler : allHandlers) {
-			builder.setRoute(allHandler.route()).setStrict(allHandler.strict());
-			for (HttpMethod m : allHandler.methods()) {
-				builder.setMethod(m);
-				build.run();
-			}
-		}
+		for (HttpMethodHandler allHandler : allHandlers)
+			for (HttpMethod m : allHandler.methods())
+				this.register(builder, method, handlersContainer, prefix + allHandler.route(), m, allHandler.strict(), allHandler.intermediate());
+	}
+
+	@Contract(mutates = "this, param1")
+	private void register(@NotNull RouteBuilder builder, @NotNull Method handler, @Nullable HandlersContainer handlersContainer,
+	                      @NotNull String route, @NotNull HttpMethod method, boolean strict, boolean intermediate) {
+		builder.setRoute(route).setMethod(method).setStrict(strict);
+		if (intermediate)
+			this.registerIntermediateRoute(builder.setIntermediateHandler(handler, handlersContainer).buildIntermediateRoute());
+		else
+			this.registerRoute(builder.setHandler(handler, handlersContainer).buildRoute());
 	}
 
 	@Contract(mutates = "param1, param2")
@@ -231,7 +222,7 @@ public class Router {
 
 		for (IntermediateRoute route : this.intermediateRoutes) {
 			if (route.match(requestPath, requestMethod)) {
-				request.setRouteParams(route.params(requestPath));
+				request.setRoute(route);
 				if (!route.getHandler().handle(request, response))
 					return;
 			}
@@ -239,7 +230,7 @@ public class Router {
 
 		Route route = this.route(requestPath, requestMethod);
 		if (route != null) {
-			request.setRouteParams(route.params(requestPath));
+			request.setRoute(route);
 			route.getHandler().handle(request, response);
 		}
 	}
