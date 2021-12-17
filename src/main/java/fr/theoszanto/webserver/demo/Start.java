@@ -8,8 +8,6 @@ import fr.theoszanto.webserver.handling.IntermediateHandler;
 import fr.theoszanto.webserver.routing.RouteBuilder;
 import fr.theoszanto.webserver.utils.JsonUtils;
 
-import java.util.Scanner;
-
 /**
  * Start an example web server.
  * 
@@ -18,7 +16,6 @@ import java.util.Scanner;
 public class Start {
 	public static void main(String[] args) {
 		WebServer ws = new WebServer(8080, "./files", "./sessions");
-		Scanner sc = new Scanner(System.in);
 
 		//GlobalHandler.enable(ws);
 		ws.loadTemplates("template").getRouter()
@@ -94,10 +91,7 @@ public class Start {
 		ws.logDebugInfo();
 		ws.getRouter().logDebugInfo();
 
-		System.out.println("Press enter to stop the server...");
-		sc.nextLine();
-		ws.close();
-		sc.close();
+		ws.closeOnShutdown();
 	}
 
 	private static class JsonExample {

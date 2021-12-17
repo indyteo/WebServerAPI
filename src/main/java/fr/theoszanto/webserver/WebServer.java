@@ -14,6 +14,7 @@ import fr.theoszanto.webserver.utils.Checks;
 import fr.theoszanto.webserver.utils.MiscUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -68,6 +69,11 @@ public class WebServer {
 	 * Indicate whether the server is running or not.
 	 */
 	private boolean running;
+
+	/**
+	 * The thread registered as a shutdown hook.
+	 */
+	private @Nullable Thread closeTask = null;
 
 	/**
 	 * Create a new WebServer, listening on the port {@code port},
@@ -141,12 +147,42 @@ public class WebServer {
 	}
 
 	/**
+	 * Schedule server close when JVM ends.
+	 *
+	 * @see		WebServer#cancelCloseOnShutdown()
+	 * @see		WebServer#close()
+	 */
+	public void closeOnShutdown() {
+		if (!this.running || this.closeTask != null)
+			return;
+		Runtime.getRuntime().addShutdownHook(this.closeTask = new Thread(() -> {
+			this.closeTask = null;
+			this.close();
+		}));
+	}
+
+	/**
+	 * Cancel scheduled server close when JVM ends.
+	 *
+	 * @see		WebServer#closeOnShutdown()
+	 * @see		WebServer#close()
+	 */
+	public void cancelCloseOnShutdown() {
+		if (!this.running || this.closeTask == null)
+			return;
+		Runtime.getRuntime().removeShutdownHook(this.closeTask);
+		this.closeTask = null;
+	}
+
+	/**
 	 * Immediately close this WebServer, making it no more
 	 * listening requests, without any delay.
 	 *
 	 * <p>If any, current handlers will be stopped.</p>
 	 * 
 	 * <p>Note: It's impossible to re-open a closed WebServer.</p>
+	 *
+	 * @see		WebServer#close(int)
 	 */
 	@Contract(mutates = "this")
 	public void close() {
@@ -161,9 +197,12 @@ public class WebServer {
 	 * @param maximumDelay
 	 * 			The maximum number of seconds to wait before closing
 	 * 			current handlers.
+	 * @see		WebServer#close()
 	 */
 	@Contract(mutates = "this")
 	public void close(int maximumDelay) {
+		if (this.closeTask != null)
+			this.cancelCloseOnShutdown();
 		this.server.stop(maximumDelay);
 		this.running = false;
 		LOGGER.info("Server closed!");
