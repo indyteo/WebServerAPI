@@ -211,8 +211,8 @@ public final class HttpResponse {
 	 * 			If an I/O exception occurs, for example,
 	 * 			if the response was already send.
 	 */
-	@Contract(mutates = "this")
-	public void sendJson(@Nullable Object response) throws IOException {
+	@Contract(value = "_ -> fail", mutates = "this")
+	public void sendJson(@Nullable Object response) throws IOException, HandlingEndException {
 		this.response.append(JsonUtils.GSON.toJson(response));
 		this.contentType(HttpMIMEType.JSON).end();
 	}
@@ -294,7 +294,7 @@ public final class HttpResponse {
 	 * @see		FileResponse
 	 */
 	@Contract(value = "_ -> fail", mutates = "this")
-	public void sendFile(@NotNull FileResponse fileResponse) throws IOException {
+	public void sendFile(@NotNull FileResponse fileResponse) throws IOException, HandlingEndException {
 		Checks.notNull(fileResponse, "file");
 
 		// Verify the file exists
@@ -343,7 +343,7 @@ public final class HttpResponse {
 	}
 
 	@Contract(value = "_ -> fail", mutates = "this")
-	public void sendTemplate(HtmlTemplate template) throws IOException {
+	public void sendTemplate(HtmlTemplate template) throws IOException, HandlingEndException {
 		if (this.status == null)
 			this.status = HttpStatus.OK;
 		this.contentType(HttpMIMEType.HTML);
@@ -370,8 +370,8 @@ public final class HttpResponse {
 	 * 			If an I/O exception occurs, for example, if the
 	 * 			response was already send.
 	 */
-	@Contract(mutates = "this")
-	public void redirect(@NotNull String location) throws IOException {
+	@Contract(value = "_ -> fail", mutates = "this")
+	public void redirect(@NotNull String location) throws IOException, HandlingEndException {
 		Checks.notNull(location, "location");
 		this.getHeaders().add("Location", location);
 		if (this.status == null)
@@ -399,7 +399,7 @@ public final class HttpResponse {
 	 * @see		HttpResponse#endWithoutBody()
 	 */
 	@Contract(value = "_ -> fail", mutates = "this")
-	public void end(boolean withResponseBody) throws IOException {
+	public void end(boolean withResponseBody) throws IOException, HandlingEndException {
 		if (withResponseBody)
 			this.end();
 		else
@@ -423,7 +423,7 @@ public final class HttpResponse {
 	 * 			response was already send.
 	 */
 	@Contract(value = " -> fail", mutates = "this")
-	public void end() throws IOException {
+	public void end() throws IOException, HandlingEndException {
 		if (this.status == null)
 			this.status = HttpStatus.OK;
 		if (this.response.length() == 0)
@@ -453,7 +453,7 @@ public final class HttpResponse {
 	 * 			response was already send.
 	 */
 	@Contract(value = " -> fail", mutates = "this")
-	public void endWithoutBody() throws IOException {
+	public void endWithoutBody() throws IOException, HandlingEndException {
 		if (this.status == null)
 			this.status = HttpStatus.NO_CONTENT;
 		this.setCookieHeaders();

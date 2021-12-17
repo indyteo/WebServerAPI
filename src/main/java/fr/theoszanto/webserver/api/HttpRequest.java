@@ -15,6 +15,7 @@ import org.jetbrains.annotations.UnmodifiableView;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Type;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -76,11 +77,15 @@ public final class HttpRequest {
 	private final @Nullable Map<String, String> params;
 
 	/**
-	 * The JSON parsed body of the request.
+	 * The raw JSON body of the request.
 	 *
 	 * @see		HttpRequest#getJsonParams()
+	 * @see		HttpRequest#getJsonParams(Class)
+	 * @see		HttpRequest#getJsonParams(Class, Object)
+	 * @see		HttpRequest#getJsonParams(Type)
+	 * @see		HttpRequest#getJsonParams(Type, Object)
 	 */
-	private final @Nullable Object jsonParams;
+	private final @Nullable String rawJsonParams;
 
 	/**
 	 * The requested route that triggered the handler.
@@ -152,10 +157,10 @@ public final class HttpRequest {
 
 		if (HttpMIMEType.fromMIME(this.header("Content-type")) == HttpMIMEType.JSON) {
 			this.params = null;
-			this.jsonParams = JsonUtils.GSON.fromJson(params, Object.class);
+			this.rawJsonParams = params;
 		} else if (params != null) {
 			this.params = new HashMap<>();
-			this.jsonParams = null;
+			this.rawJsonParams = null;
 			String[] pairs = params.replace('+', ' ').split("&");
 			for (String pair : pairs) {
 				String[] val = pair.split("=");
@@ -165,7 +170,7 @@ public final class HttpRequest {
 			}
 		} else {
 			this.params = null;
-			this.jsonParams = null;
+			this.rawJsonParams = null;
 		}
 
 		String cookieHeader = this.header("Cookie");
@@ -288,7 +293,67 @@ public final class HttpRequest {
 	 */
 	@Contract(pure = true)
 	public @Nullable Object getJsonParams() {
-		return this.jsonParams;
+		return this.getJsonParams(Object.class, null);
+	}
+
+	/**
+	 * Return the JSON parsed body.
+	 *
+	 * @param <T>
+	 * 			The type of data to retrieve
+	 * @param type
+	 * 			The Java Class to parse JSON.
+	 * @return	The JSON parsed body.
+	 */
+	@Contract(pure = true)
+	public <T> @Nullable T getJsonParams(@NotNull Class<T> type) {
+		return this.getJsonParams(type, null);
+	}
+
+	/**
+	 * Return the JSON parsed body.
+	 *
+	 * @param <T>
+	 * 			The type of data to retrieve
+	 * @param type
+	 * 			The Java Class to parse JSON.
+	 * @param def
+	 * 			The default value if no JSON params where present.
+	 * @return	The JSON parsed body.
+	 */
+	@Contract(value = "_, !null -> !null", pure = true)
+	public <T> @Nullable T getJsonParams(@NotNull Class<T> type, @Nullable T def) {
+		return this.rawJsonParams == null ? def : JsonUtils.GSON.fromJson(this.rawJsonParams, type);
+	}
+
+	/**
+	 * Return the JSON parsed body.
+	 *
+	 * @param <T>
+	 * 			The type of data to retrieve
+	 * @param type
+	 * 			The Java Type to parse JSON.
+	 * @return	The JSON parsed body.
+	 */
+	@Contract(pure = true)
+	public <T> @Nullable T getJsonParams(@NotNull Type type) {
+		return this.getJsonParams(type, null);
+	}
+
+	/**
+	 * Return the JSON parsed body.
+	 *
+	 * @param <T>
+	 * 			The type of data to retrieve
+	 * @param type
+	 * 			The Java Type to parse JSON.
+	 * @param def
+	 * 			The default value if no JSON params where present.
+	 * @return	The JSON parsed body.
+	 */
+	@Contract(value = "_, !null -> !null", pure = true)
+	public <T> @Nullable T getJsonParams(@NotNull Type type, @Nullable T def) {
+		return this.rawJsonParams == null ? def : JsonUtils.GSON.fromJson(this.rawJsonParams, type);
 	}
 
 	/**
@@ -383,12 +448,11 @@ public final class HttpRequest {
 	/**
 	 * Return the request origin ({@code schem://host:port}).
 	 *
-	 * @return	The origin of the request.
+	 * @return	The origin of the request, if provided by the client.
 	 */
 	@Contract(pure = true)
-	public @NotNull String getOrigin() {
-		URI uri = this.getURI();
-		return uri.getScheme() + "://" + uri.getHost() + ":" + uri.getPort();
+	public @Nullable String getOrigin() {
+		return this.header("Origin");
 	}
 
 	/**
@@ -524,8 +588,8 @@ public final class HttpRequest {
 			LOGGER.log(level, joiner.toString());
 		});
 		if (this.params == null) {
-			if (this.jsonParams != null)
-				LOGGER.log(level, "Request JSON body: " + this.jsonParams);
+			if (this.rawJsonParams != null)
+				LOGGER.log(level, "Request JSON body: " + this.rawJsonParams);
 		} else {
 			LOGGER.log(level, "Request params: (" + this.params.size() + ")");
 			this.params.forEach((key, value) -> LOGGER.log(level, "\t" + key + ": " + value));

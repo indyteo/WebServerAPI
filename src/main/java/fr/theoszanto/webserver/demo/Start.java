@@ -33,7 +33,7 @@ public class Start {
 								response.sendEscaped("<h1 title=\"Hey\">'Coucou' &copy;</h1>").end();
 								break;
 							case "json":
-								System.out.println(request.getJsonParams());
+								System.out.println(request.getJsonParams(Object.class));
 								JsonExample jsonExample = response.loadJson("example.json", JsonExample.class);
 								jsonExample.setNumber(jsonExample.getNumber() + 1);
 								response.saveJson("example.json", jsonExample);
