@@ -150,7 +150,7 @@ public class FileResponse {
 		 * @return	Itself, to allow chained calls.
 		 */
 		@Contract(value = "_ -> this", mutates = "this")
-		public @NotNull Builder setFile(@NotNull String path) {
+		public @NotNull Builder setFile(@NotNull String @NotNull... path) {
 			Checks.notNull(path, "path");
 			this.file = Paths.get(this.response.getServer().getRoot(), path).toFile();
 			return this;
