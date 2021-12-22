@@ -464,35 +464,7 @@ public final class HttpRequest {
 	 */
 	@Contract(value = " -> new", pure = true)
 	public @NotNull File getRequestedFile() {
-		return this.getRequestedFile("", false);
-	}
-
-	/**
-	 * Return the {@link File} object corresponding to the
-	 * requested URI and the server root.
-	 *
-	 * @param trimRoute
-	 * 			Whether to remove the route prefix or not.
-	 * @return	The File requested by the client, that might
-	 * 			not exist.
-	 */
-	@Contract(value = "_ -> new", pure = true)
-	public @NotNull File getRequestedFile(boolean trimRoute) {
-		return this.getRequestedFile("", trimRoute);
-	}
-
-	/**
-	 * Return the {@link File} object corresponding to the
-	 * requested URI and the server root.
-	 *
-	 * @param folder
-	 * 			The sub-root folder to consider.
-	 * @return	The File requested by the client, that might
-	 * 			not exist.
-	 */
-	@Contract(value = "_ -> new", pure = true)
-	public @NotNull File getRequestedFile(@NotNull String folder) {
-		return this.getRequestedFile(folder, false);
+		return this.getRequestedFile("", false, false);
 	}
 
 	/**
@@ -503,15 +475,17 @@ public final class HttpRequest {
 	 * 			The sub-root folder to consider.
 	 * @param trimRoute
 	 * 			Whether to remove the route prefix or not.
+	 * @param absoluteFolder
+	 * 			Whether to considerate the folder as absolute or not.
 	 * @return	The File requested by the client, that might
 	 * 			not exist.
 	 */
-	@Contract(value = "_, _ -> new", pure = true)
-	public @NotNull File getRequestedFile(@NotNull String folder, boolean trimRoute) {
+	@Contract(value = "_, _, _ -> new", pure = true)
+	public @NotNull File getRequestedFile(@NotNull String folder, boolean trimRoute, boolean absoluteFolder) {
 		String file = this.getURI().toString();
 		if (trimRoute)
 			file = file.replaceFirst("^" + this.getRoute().getRoute(), "");
-		return Paths.get(this.server.getRoot(), folder, file).toFile();
+		return Paths.get(absoluteFolder ? "" : this.server.getRoot(), folder, file).toFile();
 	}
 
 	/**

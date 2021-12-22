@@ -69,8 +69,12 @@ public interface IntermediateHandler {
 	@NotNull String @NotNull[] indexes = { "index.html", "index.js", "index.css" };
 
 	static @NotNull IntermediateHandler staticServe(@NotNull String path) {
+		return staticServe(path, false);
+	}
+
+	static @NotNull IntermediateHandler staticServe(@NotNull String path, boolean absolutePath) {
 		return (request, response) -> {
-			File f = request.getRequestedFile(path, true);
+			File f = request.getRequestedFile(path, true, absolutePath);
 			if (f.isDirectory()) {
 				URI requestURI = request.getURI();
 				if (requestURI.toString().endsWith("/")) {
