@@ -16,6 +16,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
+import java.nio.file.Files;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Level;
@@ -329,9 +330,12 @@ public final class HttpResponse {
 			this.exchange.sendResponseHeaders(this.status.getCode(), 0);
 			FileInputStream fs = new FileInputStream(fileResponse.getFile());
 			OutputStream responseBody = this.exchange.getResponseBody();
-			int byteRead;
+			// This is way to slow for large files
+			/* int byteRead;
 			while ((byteRead = fs.read()) != -1)
-				responseBody.write(byteRead);
+				responseBody.write(byteRead);*/
+			// A simple and stupid solution 
+			Files.copy(fileResponse.getFile().toPath(), responseBody);
 			responseBody.flush();
 			responseBody.close();
 			fs.close();
