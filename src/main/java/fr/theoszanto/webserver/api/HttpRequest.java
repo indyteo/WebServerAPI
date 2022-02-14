@@ -482,7 +482,7 @@ public final class HttpRequest {
 	 */
 	@Contract(value = "_, _, _ -> new", pure = true)
 	public @NotNull File getRequestedFile(@NotNull String folder, boolean trimRoute, boolean absoluteFolder) {
-		String file = this.getURI().toString();
+		String file = this.getURI().getPath();
 		if (trimRoute)
 			file = file.replaceFirst("^" + this.getRoute().getRoute(), "");
 		return Paths.get(absoluteFolder ? "" : this.server.getRoot(), folder, file).toFile();

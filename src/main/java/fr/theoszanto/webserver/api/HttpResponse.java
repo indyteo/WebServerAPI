@@ -11,7 +11,6 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -328,17 +327,11 @@ public final class HttpResponse {
 		try {
 			// Send file in response to client
 			this.exchange.sendResponseHeaders(this.status.getCode(), 0);
-			FileInputStream fs = new FileInputStream(fileResponse.getFile());
 			OutputStream responseBody = this.exchange.getResponseBody();
-			// This is way to slow for large files
-			/* int byteRead;
-			while ((byteRead = fs.read()) != -1)
-				responseBody.write(byteRead);*/
-			// A simple and stupid solution 
+			// Standard one byte at the time copy is too slow
 			Files.copy(fileResponse.getFile().toPath(), responseBody);
 			responseBody.flush();
 			responseBody.close();
-			fs.close();
 			throw new HandlingEndException();
 		} catch (FileNotFoundException e) {
 			// Or a 404 Not Found error
