@@ -11,6 +11,7 @@ import fr.theoszanto.webserver.handling.IntermediateHandler;
 import fr.theoszanto.webserver.routing.RouteBuilder;
 import fr.theoszanto.webserver.routing.Router;
 import fr.theoszanto.webserver.utils.Checks;
+import fr.theoszanto.webserver.utils.FileUtils;
 import fr.theoszanto.webserver.utils.MiscUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -218,6 +219,21 @@ public class WebServer {
 	@Contract(value = "_ -> this", mutates = "this")
 	public WebServer loadTemplates(String... templates) {
 		HtmlTemplate.loadTemplates(this, templates);
+		return this;
+	}
+
+	/**
+	 * Extract the root resources to the server file root.
+	 *
+	 * @param clazz
+	 * 			Any {@link Class} located where to find root resources.
+	 * @param replaceExisting
+	 * 			Whether existing resources should be replaced or not.
+	 * @return	Itself, to allow chained calls.
+	 */
+	@Contract(value = "_, _ -> this")
+	public WebServer extractRootResources(@NotNull Class<?> clazz, boolean replaceExisting) {
+		FileUtils.extractResources(clazz, this.root, new File(this.root), replaceExisting);
 		return this;
 	}
 
