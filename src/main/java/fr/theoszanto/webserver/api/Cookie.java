@@ -70,6 +70,21 @@ public class Cookie {
 		return String.join("; ", parts);
 	}
 
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) return true;
+		if (o == null || getClass() != o.getClass()) return false;
+
+		Cookie cookie = (Cookie) o;
+
+		return name.equals(cookie.name);
+	}
+
+	@Override
+	public int hashCode() {
+		return name.hashCode();
+	}
+
 	public enum SameSitePolicy {
 		STRICT, LAX, NONE;
 

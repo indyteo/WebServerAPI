@@ -22,22 +22,25 @@ public class Session {
 
 	private final @NotNull HttpResponse response;
 
-	public static final @NotNull String SESSION_ID_COOKIE_NAME = "WS_SESSION_ID";
+	public static final @NotNull String DEFAULT_SESSION_ID_COOKIE_NAME = "WS_SESSION_ID";
 	public static final long DEFAULT_SESSION_TIMEOUT = 3600;
+
+	private static @NotNull String sessionIdCookieName = DEFAULT_SESSION_ID_COOKIE_NAME;
 
 	public Session(@NotNull HttpRequest request, @NotNull HttpResponse response) throws IOException {
 		Checks.notNull(request, "request");
 		Checks.notNull(response, "response");
 		this.response = response;
 
-		this.id = request.getCookie(SESSION_ID_COOKIE_NAME);
+		this.id = request.getCookie(sessionIdCookieName);
 		if (this.id != null) {
 			this.file = this.file();
 			if (this.file.exists()) {
 				this.data = JsonUtils.fromFile(this.file, SessionData.class);
 				if (this.data.expiration < Instant.now().getEpochSecond())
 					this.destroy();
-			}
+			} else
+				this.destroy();
 		}
 
 		request.setSession(this);
@@ -55,7 +58,7 @@ public class Session {
 
 	@Contract(pure = true)
 	public boolean isInit() {
-		return this.id != null;
+		return this.id != null && this.file != null && this.file.exists();
 	}
 
 	@Contract(pure = true)
@@ -94,7 +97,7 @@ public class Session {
 			throw new IOException("Unable to initialize session " + this.id);
 		this.data = new SessionData(timeout);
 		this.response.cookie(new Cookie.Builder()
-				.setName(SESSION_ID_COOKIE_NAME)
+				.setName(sessionIdCookieName)
 				.setValue(this.id)
 				.setHttpOnly(true)
 				.setMaxAge(timeout)
@@ -110,11 +113,11 @@ public class Session {
 
 	@Contract(mutates = "this")
 	private void destroy(boolean deleteCookie) throws IOException {
-		if (this.file != null && !this.file.delete())
+		if (this.file != null && this.file.exists() && !this.file.delete())
 			throw new IOException("Unable to destroy session " + this.id);
 		this.id = null;
 		if (deleteCookie)
-			this.response.deleteCookie(SESSION_ID_COOKIE_NAME);
+			this.response.deleteCookie(sessionIdCookieName);
 	}
 
 	@Contract(mutates = "this")
@@ -127,6 +130,10 @@ public class Session {
 			this.data.values.putAll(old.values);
 		}
 		this.saveData();
+	}
+
+	public static void setSessionIdCookieName(@NotNull String sessionIdCookieName) {
+		Session.sessionIdCookieName = sessionIdCookieName;
 	}
 
 	private static class SessionData {
