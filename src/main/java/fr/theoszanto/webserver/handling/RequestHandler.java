@@ -32,7 +32,7 @@ public interface RequestHandler {
 	 */
 	RequestHandler DEFAULT = endingWithStatus(HttpStatus.NOT_FOUND);
 	/**
-	 * Log request informations then call {@link RequestHandler#NO_OP}.
+	 * Log request information then call {@link RequestHandler#NO_OP}.
 	 */
 	RequestHandler LOG = (request, response) -> {
 		request.logDebugInfo();

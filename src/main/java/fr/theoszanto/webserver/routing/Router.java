@@ -3,11 +3,13 @@ package fr.theoszanto.webserver.routing;
 import fr.theoszanto.webserver.api.HttpMethod;
 import fr.theoszanto.webserver.api.HttpRequest;
 import fr.theoszanto.webserver.api.HttpResponse;
+import fr.theoszanto.webserver.handling.ErrorsHandler;
 import fr.theoszanto.webserver.handling.GetHandler;
 import fr.theoszanto.webserver.handling.HandlersContainer;
 import fr.theoszanto.webserver.handling.HandlingPrefix;
 import fr.theoszanto.webserver.handling.HttpMethodHandler;
 import fr.theoszanto.webserver.handling.PostHandler;
+import fr.theoszanto.webserver.handling.RequestHandler;
 import fr.theoszanto.webserver.utils.Checks;
 import fr.theoszanto.webserver.utils.MiscUtils;
 import org.jetbrains.annotations.Contract;
@@ -37,6 +39,10 @@ public class Router {
 	 * All registered intermediate routes.
 	 */
 	private final @NotNull SortedSet<IntermediateRoute> intermediateRoutes = new TreeSet<>();
+
+	private @Nullable RequestHandler defaultHandler = null;
+
+	private @NotNull ErrorsHandler errorsHandler = ErrorsHandler.LOG;
 
 	/**
 	 * Return the most complete route corresponding to the
@@ -215,8 +221,21 @@ public class Router {
 			this.registerRoute(builder.setHandler(handler, handlersContainer).buildRoute());
 	}
 
+	@Contract(value = "_ -> this", mutates = "this")
+	public @NotNull Router setDefaultHandler(@NotNull RequestHandler handler) {
+		this.defaultHandler = handler;
+		return this;
+	}
+
+	@Contract(value = "_ -> this", mutates = "this")
+	public @NotNull Router setErrorsHandler(@NotNull ErrorsHandler handler) {
+		Checks.notNull(handler, "errors handler");
+		this.errorsHandler = handler;
+		return this;
+	}
+
 	@Contract(mutates = "param1, param2")
-	public void handle(@NotNull HttpRequest request, @NotNull HttpResponse response) throws Exception {
+	public void handle(@NotNull HttpRequest request, @NotNull HttpResponse response) throws Throwable {
 		String requestPath = request.getURI().getPath();
 		HttpMethod requestMethod = request.getMethod();
 
@@ -233,29 +252,37 @@ public class Router {
 			request.setRoute(route);
 			route.getHandler().handle(request, response);
 		}
+
+		if (this.defaultHandler != null)
+			this.defaultHandler.handle(request, response);
+	}
+
+	@Contract(pure = true)
+	public @NotNull ErrorsHandler getErrorsHandler() {
+		return this.errorsHandler;
 	}
 
 	/**
-	 * Log router informations using {@link Level#INFO}.
+	 * Log router information using {@link Level#INFO}.
 	 */
 	public void logDebugInfo() {
 		this.logDebugInfo(Level.INFO);
 	}
 
 	/**
-	 *  Log router informations using the given {@link Level level}.
+	 *  Log router information using the given {@link Level level}.
 	 *
 	 * @param level
-	 * 			The Level used to log informations.
+	 * 			The Level used to log information.
 	 */
 	public void logDebugInfo(@NotNull Level level) {
 		Checks.notNull(level, "level");
 		LOGGER.log(level, "Debug caller: " + MiscUtils.caller());
-		LOGGER.log(level, "v ===== Debug informations for router ===== v");
+		LOGGER.log(level, "v ===== Debug information for router ===== v");
 		LOGGER.log(level, "Registered routes: (" + this.routes.size() + ")");
 		this.routes.forEach(route -> LOGGER.log(level, "\t" + route));
 		LOGGER.log(level, "Registered intermediate routes: (" + this.intermediateRoutes.size() + ")");
 		this.intermediateRoutes.forEach(route -> LOGGER.log(level, "\t" + route));
-		LOGGER.log(level, "^ ===== Debug informations for router ===== ^");
+		LOGGER.log(level, "^ ===== Debug information for router ===== ^");
 	}
 }

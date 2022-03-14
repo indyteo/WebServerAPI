@@ -135,11 +135,8 @@ public final class HttpRequest {
 	 * 			The exchange of the request.
 	 * @param context
 	 * 			The context associated with the request.
-	 * @throws IOException
-	 * 			If an I/O exception occurs during the body-reading
-	 * 			process.
 	 */
-	public HttpRequest(@NotNull WebServer server, @NotNull HttpExchange exchange, @NotNull RequestContext context) throws IOException {
+	public HttpRequest(@NotNull WebServer server, @NotNull HttpExchange exchange, @NotNull RequestContext context) {
 		Checks.notNull(server, "server");
 		Checks.notNull(exchange, "exchange");
 		this.server = server;
@@ -150,9 +147,15 @@ public final class HttpRequest {
 
 		InputStream is = exchange.getRequestBody();
 		StringBuilder paramsReader = new StringBuilder();
-		int byteRead;
-		while ((byteRead = is.read()) != -1)
-			paramsReader.append((char) byteRead);
+		try {
+			byte[] buffer = new byte[256];
+			int byteRead;
+			while ((byteRead = is.read(buffer)) != -1)
+				paramsReader.append(new String(buffer, 0, byteRead));
+		} catch (IOException e) {
+			LOGGER.log(Level.WARNING, "Could not read request body.", e);
+			paramsReader = new StringBuilder();
+		}
 		String params = paramsReader.length() == 0 ? this.getURI().getQuery() : paramsReader.toString();
 
 		if (HttpMIMEType.fromMIME(this.header("Content-type")) == HttpMIMEType.JSON) {

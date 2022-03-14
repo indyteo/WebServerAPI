@@ -63,12 +63,11 @@ public class Handler implements HttpHandler {
 	@Override
 	public final void handle(@NotNull HttpExchange exchange) throws IOException {
 		Checks.notNull(exchange, "exchange");
-		RequestContext context = new RequestContext();
-		HttpRequest request = new HttpRequest(this.server, exchange, context);
+		HttpRequest request = new HttpRequest(this.server, exchange, new RequestContext());
 		HttpResponse response = new HttpResponse(this.server, exchange);
-		new Session(request, response);
 
 		try {
+			new Session(request, response);
 			this.server.getRouter().handle(request, response);
 
 			// Executed only if handler did not terminate
@@ -77,10 +76,16 @@ public class Handler implements HttpHandler {
 			response.end(request.getMethod().needResponseBody());
 		} catch (HandlingEndException ignored) { // Normal termination of the handler
 		} catch (Throwable e) {
-			LOGGER.log(Level.SEVERE, "An error occured while handling a request", e);
-			request.logDebugInfo();
-			response.logDebugInfo();
-			response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR).end(request.getMethod().needResponseBody());
+			try {
+				this.server.getRouter().getErrorsHandler().handleError(request, response, e);
+
+				// Executed only if error handler did not terminate
+				response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR).end(request.getMethod().needResponseBody());
+			} catch (HandlingEndException ignored) { // Normal termination of the error handler
+			} catch (Throwable fatal) {
+				LOGGER.log(Level.SEVERE, "A fatal error occurred while handling previous error!", fatal);
+				throw new IOException("Could not provide any response to client", fatal);
+			}
 		}
 	}
 }
