@@ -223,6 +223,20 @@ public class WebServer {
 	}
 
 	/**
+	 * Load the given templates for the current server.
+	 *
+	 * @param clazz
+	 * 			The class containing templates fields to load.
+	 * @return	Itself, to allow chained calls.
+	 * @see		fr.theoszanto.webserver.api.FileTemplate @FileTemplate
+	 */
+	@Contract(value = "_ -> this", mutates = "this")
+	public WebServer loadTemplates(Class<?> clazz) {
+		HtmlTemplate.loadTemplates(this, clazz);
+		return this;
+	}
+
+	/**
 	 * Extract the root resources to the server file root.
 	 *
 	 * @param clazz

@@ -56,5 +56,4 @@ public class JsonUtils {
 		GSON.toJson(object, writer);
 		writer.close();
 	}
-
 }

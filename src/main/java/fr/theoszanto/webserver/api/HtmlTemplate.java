@@ -7,6 +7,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -63,9 +65,28 @@ public class HtmlTemplate {
 	}
 
 	public static void loadTemplates(WebServer server, String... templates) {
-		String root = server.getRoot();
 		for (String template : templates)
-			loadedTemplates.put(template, new HtmlTemplate(new File(root, template + ".html")));
+			loadTemplate(server, template);
+	}
+
+	public static void loadTemplates(WebServer server, Class<?> clazz) {
+		for (Field field : clazz.getDeclaredFields()) {
+			FileTemplate fileTemplate = field.getAnnotation(FileTemplate.class);
+			if (fileTemplate != null && Modifier.isStatic(field.getModifiers()) && !Modifier.isFinal(field.getModifiers())) {
+				try {
+					field.setAccessible(true);
+					field.set(null, loadTemplate(server, fileTemplate.value()));
+				} catch (IllegalAccessException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+
+	private static HtmlTemplate loadTemplate(WebServer server, String template) {
+		HtmlTemplate htmlTemplate = new HtmlTemplate(new File(server.getRoot(), template + ".html"));
+		loadedTemplates.put(template, htmlTemplate);
+		return htmlTemplate;
 	}
 
 	public static HtmlTemplate getTemplate(String template) {
