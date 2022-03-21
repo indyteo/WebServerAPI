@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -51,7 +52,7 @@ public class HtmlTemplate {
 					if (value instanceof HtmlTemplate)
 						((HtmlTemplate) value).send(sendTo);
 					else if (value != null)
-						sendTo.write(value.toString().getBytes());
+						sendTo.write(value.toString().getBytes(StandardCharsets.UTF_8));
 					name = new StringBuilder();
 				} else
 					name.append(c);

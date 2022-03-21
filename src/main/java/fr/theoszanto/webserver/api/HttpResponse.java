@@ -15,6 +15,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashSet;
 import java.util.Set;
@@ -427,7 +428,7 @@ public final class HttpResponse {
 			this.send("<h1>" + this.status.getStatus() + "</h1>");
 		this.setCookieHeaders();
 
-		byte[] responseByte = this.response.toString().getBytes();
+		byte[] responseByte = this.response.toString().getBytes(StandardCharsets.UTF_8);
 		this.exchange.sendResponseHeaders(this.status.getCode(), responseByte.length);
 		OutputStream responseBody = this.exchange.getResponseBody();
 		responseBody.write(responseByte);
