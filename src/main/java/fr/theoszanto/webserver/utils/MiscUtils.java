@@ -72,6 +72,11 @@ public class MiscUtils {
 		return string == null || string.isEmpty();
 	}
 
+	@Contract(value = "null -> false", pure = true)
+	public static boolean nonEmpty(@Nullable String string) {
+		return !isEmpty(string);
+	}
+
 	@Contract(value = "null, _ -> true; _, null -> true", pure = true)
 	public static boolean nullOrEquals(@Nullable Object o1, @Nullable Object o2) {
 		return o1 == null || o2 == null || o1.equals(o2);

@@ -6,6 +6,7 @@ import fr.theoszanto.webserver.handling.HandlingEndException;
 import fr.theoszanto.webserver.handling.IntermediateHandler;
 import fr.theoszanto.webserver.handling.RequestHandler;
 import fr.theoszanto.webserver.utils.Checks;
+import fr.theoszanto.webserver.utils.MiscUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -13,6 +14,8 @@ import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 public class RouteBuilder {
 	private @NotNull String route = "/";
@@ -39,7 +42,7 @@ public class RouteBuilder {
 	@Contract(value = "_ -> this", mutates = "this")
 	public @NotNull RouteBuilder setRoute(@NotNull String route) {
 		Checks.notEmpty(route, "route");
-		this.route = route;
+		this.route = normalizeRoute(route);
 		return this;
 	}
 
@@ -119,5 +122,9 @@ public class RouteBuilder {
 				throw new IOException("An exception occured during request intermediate handling", e);
 			}
 		};
+	}
+
+	private static @NotNull String normalizeRoute(@NotNull String route) {
+		return "/" + Arrays.stream(route.split("/")).filter(MiscUtils::nonEmpty).collect(Collectors.joining("/"));
 	}
 }
