@@ -16,6 +16,7 @@ import java.nio.file.Paths;
 
 public class JsonUtils {
 	public static final Gson GSON = new GsonBuilder()
+			.setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
 			.addSerializationExclusionStrategy(new JsonExclude.Strategy(true))
 			.addDeserializationExclusionStrategy(new JsonExclude.Strategy(false))
 			.create();
