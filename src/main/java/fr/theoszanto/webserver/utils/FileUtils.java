@@ -22,7 +22,7 @@ public class FileUtils {
 	public static @NotNull URI appendURI(@NotNull URI uri, @NotNull String @NotNull... paths) {
 		for (String path : paths)
 			for (String append : path.split("[/\\\\]"))
-				uri = uri.resolve(append);
+				uri = uri.resolve(append + "/");
 		return uri;
 	}
 
