@@ -79,7 +79,7 @@ public class Router {
 	@Contract(value = "_ -> this", mutates = "this")
 	public @NotNull Router registerHandlers(@NotNull HandlersContainer handlers) {
 		Checks.notNull(handlers, "handlers");
-		return this.registerHandlers(handlers, handlingPrefix(handlers.getClass()));
+		return this.registerHandlers(handlers, "");
 	}
 
 	/**
@@ -96,7 +96,7 @@ public class Router {
 	@Contract(value = "_, _ -> this", mutates = "this")
 	public @NotNull Router registerHandlers(@NotNull HandlersContainer handlers, @NotNull String prefix) {
 		Checks.notNull(handlers, "handlers");
-		return this.registerHandlers(handlers.getClass(), handlers, prefix);
+		return this.registerHandlers(handlers.getClass(), handlers, prefix + handlingPrefix(handlers.getClass()));
 	}
 
 	/**
@@ -109,7 +109,7 @@ public class Router {
 	@Contract(value = "_ -> this", mutates = "this")
 	public @NotNull Router registerHandlers(@NotNull Class<? extends HandlersContainer> handlersClass) {
 		Checks.notNull(handlersClass, "handlersClass");
-		return this.registerHandlers(handlersClass, handlingPrefix(handlersClass));
+		return this.registerHandlers(handlersClass, "");
 	}
 
 	/**
@@ -124,7 +124,7 @@ public class Router {
 	@Contract(value = "_, _ -> this", mutates = "this")
 	public @NotNull Router registerHandlers(@NotNull Class<? extends HandlersContainer> handlersClass, @NotNull String prefix) {
 		Checks.notNull(handlersClass, "handlersClass");
-		return this.registerHandlers(handlersClass, null, prefix);
+		return this.registerHandlers(handlersClass, null, prefix + handlingPrefix(handlersClass));
 	}
 
 	/**
@@ -151,9 +151,9 @@ public class Router {
 		return this;
 	}
 
-	private static @NotNull String handlingPrefix(@NotNull Class<? extends HandlersContainer> handlersClass) {
-		HandlingPrefix prefix = handlersClass.getAnnotation(HandlingPrefix.class);
-		return prefix == null ? "" : prefix.value();
+	private static @NotNull String handlingPrefix(@NotNull Class<?> handlersClass) {
+		return MiscUtils.ifNotNull(handlersClass.getDeclaringClass(), Router::handlingPrefix, "") +
+				MiscUtils.ifNotNull(handlersClass.getAnnotation(HandlingPrefix.class), HandlingPrefix::value, "");
 	}
 
 	/**

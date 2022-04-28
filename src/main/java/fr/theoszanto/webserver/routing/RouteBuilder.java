@@ -62,7 +62,7 @@ public class RouteBuilder {
 	public @NotNull RouteBuilder setHandler(@NotNull Method handler, @Nullable HandlersContainer container) {
 		this.handler = handlerMethod(handler, container);
 		if (this.name == null)
-			this.name = handler.getName();
+			this.name = handler.getDeclaringClass().getName() + "#" + handler.getName();
 		return this;
 	}
 
@@ -77,7 +77,7 @@ public class RouteBuilder {
 	public @NotNull RouteBuilder setIntermediateHandler(@NotNull Method handler, @Nullable HandlersContainer container) {
 		this.intermediateHandler = intermediateHandlerMethod(handler, container);
 		if (this.name == null)
-			this.name = handler.getName();
+			this.name = handler.getDeclaringClass().getName() + "#" + handler.getName();
 		return this;
 	}
 
