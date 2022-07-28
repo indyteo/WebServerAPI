@@ -267,7 +267,7 @@ public final class HttpResponse {
 
 	@Contract(value = "_ -> this", mutates = "this")
 	public @NotNull HttpResponse deleteCookie(String name) {
-		return this.cookie(new Cookie.Builder().setName(name).setMaxAge(0).setSameSite(Cookie.SameSitePolicy.LAX).build());
+		return this.cookie(new Cookie.Builder().setName(name).setMaxAge(0).build());
 	}
 
 	/**

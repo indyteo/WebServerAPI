@@ -49,8 +49,44 @@ public class Cookie {
 		this.sameSite = sameSite;
 	}
 
+	public @NotNull String getName() {
+		return this.name;
+	}
+
+	public @NotNull String getValue() {
+		return this.value;
+	}
+
+	public @Nullable Date getExpires() {
+		return this.expires;
+	}
+
+	public long getMaxAge() {
+		return this.maxAge;
+	}
+
+	public @Nullable String getDomain() {
+		return this.domain;
+	}
+
+	public @Nullable String getPath() {
+		return this.path;
+	}
+
+	public boolean isSecure() {
+		return this.secure;
+	}
+
+	public boolean isHttpOnly() {
+		return this.httpOnly;
+	}
+
+	public @Nullable SameSitePolicy getSameSite() {
+		return this.sameSite;
+	}
+
 	@Override
-	public String toString() {
+	public @NotNull String toString() {
 		List<String> parts = new ArrayList<>();
 		parts.add(this.name + "=" + this.value);
 		if (this.expires != null)
@@ -68,6 +104,19 @@ public class Cookie {
 		if (this.sameSite != null)
 			parts.add("SameSite=" + this.sameSite);
 		return String.join("; ", parts);
+	}
+
+	public @NotNull Builder toBuilder() {
+		return new Builder()
+				.setName(this.name)
+				.setValue(this.value)
+				.setExpires(this.expires)
+				.setMaxAge(this.maxAge)
+				.setDomain(this.domain)
+				.setPath(this.path)
+				.setSecure(this.secure)
+				.setHttpOnly(this.httpOnly)
+				.setSameSite(this.sameSite);
 	}
 
 	@Override

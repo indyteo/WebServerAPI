@@ -6,7 +6,6 @@ import fr.theoszanto.webserver.utils.MiscUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.Range;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,17 +21,18 @@ public class Session {
 
 	private final @NotNull HttpResponse response;
 
-	public static final @NotNull String DEFAULT_SESSION_ID_COOKIE_NAME = "WS_SESSION_ID";
-	public static final long DEFAULT_SESSION_TIMEOUT = 3600;
-
-	private static @NotNull String sessionIdCookieName = DEFAULT_SESSION_ID_COOKIE_NAME;
+	private static @NotNull Cookie sessionIdCookieTemplate = new Cookie.Builder()
+			.setName("WS_SESSION_ID")
+			.setHttpOnly(true)
+			.setMaxAge(3600)
+			.build();
 
 	public Session(@NotNull HttpRequest request, @NotNull HttpResponse response) throws IOException {
 		Checks.notNull(request, "request");
 		Checks.notNull(response, "response");
 		this.response = response;
 
-		this.id = request.getCookie(sessionIdCookieName);
+		this.id = request.getCookie(sessionIdCookieTemplate.getName());
 		if (this.id != null) {
 			this.file = this.file();
 			if (this.file.exists()) {
@@ -83,11 +83,6 @@ public class Session {
 
 	@Contract(mutates = "this")
 	public void init() throws IOException {
-		this.init(DEFAULT_SESSION_TIMEOUT);
-	}
-
-	@Contract(mutates = "this")
-	public void init(@Range(from = 0, to = Long.MAX_VALUE) long timeout) throws IOException {
 		if (this.isInit())
 			return;
 
@@ -95,14 +90,8 @@ public class Session {
 		this.file = this.file();
 		if (!this.file.createNewFile())
 			throw new IOException("Unable to initialize session " + this.id);
-		this.data = new SessionData(timeout);
-		this.response.cookie(new Cookie.Builder()
-				.setName(sessionIdCookieName)
-				.setValue(this.id)
-				.setHttpOnly(true)
-				.setMaxAge(timeout)
-				.setSameSite(Cookie.SameSitePolicy.LAX)
-				.build());
+		this.data = new SessionData(sessionIdCookieTemplate.getMaxAge());
+		this.response.cookie(sessionIdCookieTemplate.toBuilder().setValue(this.id).build());
 		JsonUtils.toFile(this.file, this.data);
 	}
 
@@ -117,7 +106,7 @@ public class Session {
 			throw new IOException("Unable to destroy session " + this.id);
 		this.id = null;
 		if (deleteCookie)
-			this.response.deleteCookie(sessionIdCookieName);
+			this.response.deleteCookie(sessionIdCookieTemplate.getName());
 	}
 
 	@Contract(mutates = "this")
@@ -125,24 +114,22 @@ public class Session {
 		SessionData old = this.data;
 		this.destroy(false);
 		if (old != null) {
-			this.init(old.timeout);
+			this.init();
 			assert this.data != null; // Data cannot be null after init call
 			this.data.values.putAll(old.values);
 		}
 		this.saveData();
 	}
 
-	public static void setSessionIdCookieName(@NotNull String sessionIdCookieName) {
-		Session.sessionIdCookieName = sessionIdCookieName;
+	public static void setSessionIdCookieTemplate(@NotNull Cookie sessionIdCookieTemplate) {
+		Session.sessionIdCookieTemplate = sessionIdCookieTemplate;
 	}
 
 	private static class SessionData {
-		private final long timeout;
 		private final long expiration;
 		private final @NotNull Map<String, String> values;
 
 		private SessionData(long timeout) {
-			this.timeout = timeout;
 			this.expiration = Instant.now().getEpochSecond() + timeout;
 			this.values = new HashMap<>();
 		}
