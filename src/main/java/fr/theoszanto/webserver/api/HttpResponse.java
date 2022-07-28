@@ -304,10 +304,6 @@ public final class HttpResponse {
 			return;
 		}
 
-		// Ensure a valid status is set
-		if (this.status == null)
-			this.status = HttpStatus.OK;
-
 		// Retrieve the MIME type and deny access if unknown extension
 		HttpMIMEType mime = MiscUtils.ifNullGet(fileResponse.getType(), () -> HttpMIMEType.fromExtension(fileResponse.getFile()));
 		if (mime == null) {
@@ -318,22 +314,14 @@ public final class HttpResponse {
 				return;
 			}
 		}
-		// Then, set the Content-type header
-		this.contentType(mime);
 
 		// Add Content-disposition if needed to download
 		if (fileResponse.isDownload())
 			this.header("Content-disposition", "attachment; filename=\"" + fileResponse.getFile().getName() + "\"");
 
 		try {
-			// Send file in response to client
-			this.exchange.sendResponseHeaders(this.status.getCode(), 0);
-			OutputStream responseBody = this.exchange.getResponseBody();
 			// Standard one byte at the time copy is too slow
-			Files.copy(fileResponse.getFile().toPath(), responseBody);
-			responseBody.flush();
-			responseBody.close();
-			throw new HandlingEndException();
+			this.sendCustom(mime, responseBody -> Files.copy(fileResponse.getFile().toPath(), responseBody));
 		} catch (FileNotFoundException e) {
 			// Or a 404 Not Found error
 			this.setStatus(HttpStatus.NOT_FOUND).contentType(HttpMIMEType.HTML).end();
@@ -342,14 +330,23 @@ public final class HttpResponse {
 
 	@Contract(value = "_ -> fail", mutates = "this")
 	public void sendTemplate(HtmlTemplate template) throws IOException, HandlingEndException {
+		this.sendCustom(HttpMIMEType.HTML, template::send);
+	}
+
+	@Contract(value = "_, _ -> fail", mutates = "this")
+	public void sendCustom(HttpMIMEType type, @NotNull ResponseBodyProvider bodyProvider) throws IOException, HandlingEndException {
+		// Ensure a valid status is set
 		if (this.status == null)
 			this.status = HttpStatus.OK;
-		this.contentType(HttpMIMEType.HTML);
+		// Then, set the Content-type header
+		this.contentType(type);
+		// Send headers in response to client
 		this.exchange.sendResponseHeaders(this.status.getCode(), 0);
-		OutputStream responseBody = this.exchange.getResponseBody();
-		template.send(responseBody);
-		responseBody.flush();
-		responseBody.close();
+		// Finally send response body to client
+		try (OutputStream responseBody = this.exchange.getResponseBody()) {
+			bodyProvider.fillOutputStream(responseBody);
+			responseBody.flush();
+		}
 		throw new HandlingEndException();
 	}
 
