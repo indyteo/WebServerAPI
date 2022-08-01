@@ -53,13 +53,13 @@ public final class HttpResponse {
 	private final @NotNull Set<@NotNull Cookie> cookies;
 
 	/**
-	 * The response that will be send to the client before
+	 * The response that will be sent to the client before
 	 * ending handling with {@link HttpResponse#end()}.
 	 */
 	private final @NotNull StringBuilder response = new StringBuilder();
 
 	/**
-	 * The status to be send when calling {@link HttpResponse#end()}
+	 * The status to be sent when calling {@link HttpResponse#end()}
 	 */
 	private @Nullable HttpStatus status;
 
@@ -82,7 +82,7 @@ public final class HttpResponse {
 	}
 
 	/**
-	 * Return the response headers, used to give informations
+	 * Return the response headers, used to give information
 	 * about our response.
 	 * 
 	 * @return	The response {@link Headers headers}
@@ -179,7 +179,7 @@ public final class HttpResponse {
 	 * @return	The loaded JSON data.
 	 * @throws IOException
 	 * 			If an I/O exception occurs, for example,
-	 * 			if the file doesn't exists.
+	 * 			if the file doesn't exist.
 	 */
 	@Contract(value = "null, _ -> null; !null, _ -> !null", pure = true)
 	public <T> @Nullable T loadJson(@Nullable String path, @NotNull Type type) throws IOException {
@@ -219,7 +219,7 @@ public final class HttpResponse {
 	}
 
 	/**
-	 * Define the HttpStatus to be send when
+	 * Define the HttpStatus to be sent when
 	 * calling {@link HttpResponse#end()}.
 	 * 
 	 * @param status
@@ -374,14 +374,15 @@ public final class HttpResponse {
 		this.end();
 	}
 
-	private void setCookieHeaders() {
+	private void beforeHeadersSend() throws IOException {
 		for (Cookie cookie : this.cookies)
 			this.headerAppend("Set-cookie", cookie.toString());
+		this.server.getRouter().handleBeforeHeadersSend(this);
 	}
 
 	/**
 	 * End this handling by calling the appropriate ending method
-	 * according the the {@code withResponseBody} parameter.
+	 * according to the {@code withResponseBody} parameter.
 	 *
 	 * <p>This is a terminal operation.</p>
 	 *
@@ -423,7 +424,7 @@ public final class HttpResponse {
 			this.status = HttpStatus.OK;
 		if (this.response.length() == 0)
 			this.send("<h1>" + this.status.getStatus() + "</h1>");
-		this.setCookieHeaders();
+		this.beforeHeadersSend();
 
 		byte[] responseByte = this.response.toString().getBytes(StandardCharsets.UTF_8);
 		this.exchange.sendResponseHeaders(this.status.getCode(), responseByte.length);
@@ -451,7 +452,7 @@ public final class HttpResponse {
 	public void endWithoutBody() throws IOException, HandlingEndException {
 		if (this.status == null)
 			this.status = HttpStatus.NO_CONTENT;
-		this.setCookieHeaders();
+		this.beforeHeadersSend();
 		this.exchange.sendResponseHeaders(status.getCode(), -1);
 		throw new HandlingEndException();
 	}
@@ -461,17 +462,17 @@ public final class HttpResponse {
 	}
 
 	/**
-	 * Log response informations using {@link Level#INFO}.
+	 * Log response information using {@link Level#INFO}.
 	 */
 	public void logDebugInfo() {
 		this.logDebugInfo(Level.INFO);
 	}
 
 	/**
-	 *  Log response informations using the given {@link Level level}.
+	 *  Log response information using the given {@link Level level}.
 	 *
 	 * @param level
-	 * 			The Level used to log informations.
+	 * 			The Level used to log information.
 	 */
 	public void logDebugInfo(@NotNull Level level) {
 		Checks.notNull(level, "level");

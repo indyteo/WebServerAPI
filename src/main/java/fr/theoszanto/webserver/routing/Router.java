@@ -7,6 +7,7 @@ import fr.theoszanto.webserver.handling.ErrorsHandler;
 import fr.theoszanto.webserver.handling.GetHandler;
 import fr.theoszanto.webserver.handling.HandlersContainer;
 import fr.theoszanto.webserver.handling.HandlingPrefix;
+import fr.theoszanto.webserver.handling.HeadersBeforeSendHandler;
 import fr.theoszanto.webserver.handling.HttpMethodHandler;
 import fr.theoszanto.webserver.handling.PostHandler;
 import fr.theoszanto.webserver.handling.RequestHandler;
@@ -16,8 +17,11 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -39,6 +43,11 @@ public class Router {
 	 * All registered intermediate routes.
 	 */
 	private final @NotNull SortedSet<IntermediateRoute> intermediateRoutes = new TreeSet<>();
+
+	/**
+	 * All handlers to be invoked before cookies are sent.
+	 */
+	private final @NotNull List<HeadersBeforeSendHandler> headersBeforeSendHandlers = new ArrayList<>();
 
 	private @Nullable RequestHandler defaultHandler = null;
 
@@ -222,6 +231,12 @@ public class Router {
 	}
 
 	@Contract(value = "_ -> this", mutates = "this")
+	public @NotNull Router addHeadersBeforeSendHandler(@NotNull HeadersBeforeSendHandler handler) {
+		this.headersBeforeSendHandlers.add(handler);
+		return this;
+	}
+
+	@Contract(value = "_ -> this", mutates = "this")
 	public @NotNull Router setDefaultHandler(@NotNull RequestHandler handler) {
 		this.defaultHandler = handler;
 		return this;
@@ -255,6 +270,12 @@ public class Router {
 
 		if (this.defaultHandler != null)
 			this.defaultHandler.handle(request, response);
+	}
+
+	@Contract(mutates = "param1")
+	public void handleBeforeHeadersSend(@NotNull HttpResponse response) throws IOException {
+		for (HeadersBeforeSendHandler handler : this.headersBeforeSendHandlers)
+			handler.beforeHeadersSend(response);
 	}
 
 	@Contract(pure = true)

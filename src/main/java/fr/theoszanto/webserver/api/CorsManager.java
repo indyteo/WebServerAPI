@@ -1,5 +1,6 @@
 package fr.theoszanto.webserver.api;
 
+import fr.theoszanto.webserver.WebServer;
 import fr.theoszanto.webserver.handling.HandlersContainer;
 import fr.theoszanto.webserver.handling.HttpMethodHandler;
 import fr.theoszanto.webserver.utils.Checks;
@@ -17,17 +18,24 @@ public class CorsManager implements HandlersContainer {
 	private @Nullable List<@NotNull String> allowedHeaders = null;
 	private @Nullable List<@NotNull HttpMethod> allowedMethods = null;
 	private boolean allowCredentials = true;
+	private @Nullable List<@NotNull String> exposedHeaders = null;
 
 	public static final @NotNull String ALLOW_ORIGIN = "Access-control-allow-origin";
 	public static final @NotNull String ALLOW_HEADERS = "Access-control-allow-headers";
 	public static final @NotNull String ALLOW_METHODS = "Access-control-allow-methods";
 	public static final @NotNull String ALLOW_CREDENTIALS = "Access-control-allow-credentials";
 
+	public static final @NotNull String EXPOSE_HEADERS = "Access-control-expose-headers";
+
 	public static final @NotNull String REQUEST_ORIGIN = "Origin";
 	public static final @NotNull String REQUEST_HEADERS = "Access-control-request-headers";
 	public static final @NotNull String REQUEST_METHOD = "Access-control-request-method";
 
-	public CorsManager() {}
+	public static final @NotNull List<@NotNull String> HIDDEN_HEADERS = Arrays.asList("cookie", "set-cookie");
+
+	public CorsManager(@NotNull WebServer server) {
+		server.getRouter().addHeadersBeforeSendHandler(this::beforeHeadersSend);
+	}
 
 	public @NotNull CorsManager allowAllOrigins() {
 		this.allowedOrigins = null;
@@ -108,14 +116,14 @@ public class CorsManager implements HandlersContainer {
 	@HttpMethodHandler(methods = HttpMethod.OPTIONS)
 	private void optionsCorsHeaders(HttpRequest request, HttpResponse response) throws IOException {
 		if (this.allowedOrigins == null) {
-			// Allow every origins
+			// Allow every origin
 			String origin = request.header(REQUEST_ORIGIN);
 			if (origin != null)
 				response.header(ALLOW_ORIGIN, origin);
 		}
 
 		if (this.allowedHeaders == null) {
-			// Allow every headers
+			// Allow every header
 			String headers = request.header(REQUEST_HEADERS);
 			if (headers != null)
 				response.header(ALLOW_HEADERS, headers);
@@ -123,7 +131,7 @@ public class CorsManager implements HandlersContainer {
 			response.header(ALLOW_HEADERS, String.join(", ", this.allowedHeaders));
 
 		if (this.allowedMethods == null) {
-			// Allow every methods
+			// Allow every method
 			String method = request.header(REQUEST_METHOD);
 			if (method != null)
 				response.header(ALLOW_METHODS, method);
@@ -131,5 +139,22 @@ public class CorsManager implements HandlersContainer {
 			response.header(ALLOW_METHODS, this.allowedMethods.stream().map(HttpMethod::toString).collect(Collectors.joining(", ")));
 
 		response.setStatus(HttpStatus.OK).end();
+	}
+
+	private static boolean headerNotHidden(@NotNull String header) {
+		return !HIDDEN_HEADERS.contains(header);
+	}
+
+	private @NotNull String getHeadersToExpose(@NotNull HttpResponse response) {
+		if (this.exposedHeaders == null)
+			return response.getHeaders().keySet().stream()
+					.map(String::toLowerCase)
+					.filter(CorsManager::headerNotHidden)
+					.collect(Collectors.joining(", "));
+		return String.join(", ", this.exposedHeaders);
+	}
+
+	private void beforeHeadersSend(@NotNull HttpResponse response) {
+		response.header(EXPOSE_HEADERS, this.getHeadersToExpose(response));
 	}
 }
