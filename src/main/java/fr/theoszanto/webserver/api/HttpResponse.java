@@ -406,12 +406,10 @@ public final class HttpResponse {
 	 * End this handling.
 	 * 
 	 * <p>If set, the {@link HttpResponse#status actual status}
-	 * will be send, otherwise a default {@link HttpStatus#OK 200 OK}
-	 * status code is send.</p>
-	 * 
-	 * <p>If no response exists when this method is called,
-	 * the String status will be send as response.</p>
-	 * 
+	 * will be send, otherwise a default {@link HttpStatus#NO_CONTENT 204 No Content}
+	 * status code (if no response exists when this method is called),
+	 * or a {@link HttpStatus#OK 200 OK} status code is send.</p>
+	 *
 	 * <p>This is a terminal operation.</p>
 	 *
 	 * @throws IOException
@@ -421,17 +419,17 @@ public final class HttpResponse {
 	@Contract(value = " -> fail", mutates = "this")
 	public void end() throws IOException, HandlingEndException {
 		if (this.status == null)
-			this.status = HttpStatus.OK;
-		if (this.response.length() == 0)
-			this.send("<h1>" + this.status.getStatus() + "</h1>");
+			this.status = this.response.length() == 0 ? HttpStatus.NO_CONTENT : HttpStatus.OK;
 		this.beforeHeadersSend();
 
 		byte[] responseByte = this.response.toString().getBytes(StandardCharsets.UTF_8);
-		this.exchange.sendResponseHeaders(this.status.getCode(), responseByte.length);
-		OutputStream responseBody = this.exchange.getResponseBody();
-		responseBody.write(responseByte);
-		responseBody.flush();
-		responseBody.close();
+		this.exchange.sendResponseHeaders(this.status.getCode(), responseByte.length == 0 ? -1 : responseByte.length);
+		if (responseByte.length > 0) {
+			OutputStream responseBody = this.exchange.getResponseBody();
+			responseBody.write(responseByte);
+			responseBody.flush();
+			responseBody.close();
+		}
 		throw new HandlingEndException();
 	}
 
