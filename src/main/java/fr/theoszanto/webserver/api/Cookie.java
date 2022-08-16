@@ -1,14 +1,13 @@
 package fr.theoszanto.webserver.api;
 
 import fr.theoszanto.webserver.utils.Checks;
+import fr.theoszanto.webserver.utils.MiscUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.TimeZone;
 
 public class Cookie {
 	private final @NotNull String name;
@@ -20,12 +19,6 @@ public class Cookie {
 	private final boolean secure;
 	private final boolean httpOnly;
 	private final @Nullable SameSitePolicy sameSite;
-
-	private static final DateFormat gmtFormat = DateFormat.getInstance();
-
-	static {
-		gmtFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
-	}
 
 	public Cookie(@NotNull String name,
 	              @NotNull String value,
@@ -90,7 +83,7 @@ public class Cookie {
 		List<String> parts = new ArrayList<>();
 		parts.add(this.name + "=" + this.value);
 		if (this.expires != null)
-			parts.add("Expires=" + gmtFormat.format(this.expires));
+			parts.add("Expires=" + MiscUtils.HTTP_DATE_FORMAT.format(this.expires));
 		if (this.maxAge != -1)
 			parts.add("Max-Age=" + this.maxAge);
 		if (this.domain != null)

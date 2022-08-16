@@ -5,16 +5,21 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Range;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class MiscUtils {
+	public static final @NotNull DateFormat HTTP_DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ENGLISH);
 	public static final @NotNull Pattern HTML_SPECIAL_CHARS = Pattern.compile("[&<>\"']");
 	private static final @NotNull Map<Character, String> HTML_ESCAPE_MAP = new HashMap<Character, String>() {{
 		put('&', "&amp;");
@@ -29,6 +34,10 @@ public class MiscUtils {
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
 	};
+
+	static {
+		HTTP_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("GMT"));
+	}
 
 	private MiscUtils() {}
 
