@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -105,6 +106,7 @@ public class Router {
 	@Contract(value = "_, _ -> this", mutates = "this")
 	public @NotNull Router registerHandlers(@NotNull HandlersContainer handlers, @NotNull String prefix) {
 		Checks.notNull(handlers, "handlers");
+		Checks.notNull(prefix, "prefix");
 		return this.registerHandlers(handlers.getClass(), handlers, prefix + handlingPrefix(handlers.getClass()));
 	}
 
@@ -133,6 +135,93 @@ public class Router {
 	@Contract(value = "_, _ -> this", mutates = "this")
 	public @NotNull Router registerHandlers(@NotNull Class<? extends HandlersContainer> handlersClass, @NotNull String prefix) {
 		Checks.notNull(handlersClass, "handlersClass");
+		Checks.notNull(prefix, "prefix");
+		return this.registerHandlers(handlersClass, null, prefix + handlingPrefix(handlersClass));
+	}
+
+	/**
+	 * Register handlers contained in the HandlersContainer instance you
+	 * gave if the given condition is {@code true}.
+	 *
+	 * @param condition
+	 * 			The condition to register the handlers
+	 * @param handlersSource
+	 * 			A supplier to get the instance of the
+	 * 			{@link HandlersContainer handlers container}
+	 * 			to register.
+	 * @return	Itself, to allow chained calls.
+	 */
+	@Contract(value = "_, _ -> this", mutates = "this")
+	public @NotNull Router registerHandlersConditionally(boolean condition, @NotNull Supplier<@NotNull HandlersContainer> handlersSource) {
+		Checks.notNull(handlersSource, "handlersSource");
+		if (!condition)
+			return this;
+		HandlersContainer handlers = handlersSource.get();
+		Checks.notNull(handlers, "handlers");
+		return this.registerHandlers(handlers, "");
+	}
+
+	/**
+	 * Register handlers contained in the HandlersContainer instance you
+	 * gave if the given condition is {@code true}.
+	 *
+	 * @param condition
+	 * 			The condition to register the handlers
+	 * @param handlersSource
+	 * 			A supplier to get the instance of the
+	 * 			{@link HandlersContainer handlers container}
+	 * 			to register.
+	 * @param prefix
+	 * 			The route prefix for handlers.
+	 * @return	Itself, to allow chained calls.
+	 */
+	@Contract(value = "_, _, _ -> this", mutates = "this")
+	public @NotNull Router registerHandlersConditionally(boolean condition, @NotNull Supplier<@NotNull HandlersContainer> handlersSource, @NotNull String prefix) {
+		Checks.notNull(handlersSource, "handlersSource");
+		Checks.notNull(prefix, "prefix");
+		if (!condition)
+			return this;
+		HandlersContainer handlers = handlersSource.get();
+		Checks.notNull(handlers, "handlers");
+		return this.registerHandlers(handlers.getClass(), handlers, prefix + handlingPrefix(handlers.getClass()));
+	}
+
+	/**
+	 * Register static handlers contained in the HandlersContainer class
+	 * if the given condition is {@code true}.
+	 *
+	 * @param condition
+	 * 			The condition to register the handlers
+	 * @param handlersClass
+	 * 			The class where the handlers are.
+	 * @return	Itself, to allow chained calls.
+	 */
+	@Contract(value = "_, _ -> this", mutates = "this")
+	public @NotNull Router registerHandlersConditionally(boolean condition, @NotNull Class<? extends HandlersContainer> handlersClass) {
+		Checks.notNull(handlersClass, "handlersClass");
+		if (!condition)
+			return this;
+		return this.registerHandlers(handlersClass, "");
+	}
+
+	/**
+	 * Register static handlers contained in the HandlersContainer class
+	 * if the given condition is {@code true}.
+	 *
+	 * @param condition
+	 * 			The condition to register the handlers
+	 * @param handlersClass
+	 * 			The class where the handlers are.
+	 * @param prefix
+	 * 			The route prefix for handlers.
+	 * @return	Itself, to allow chained calls.
+	 */
+	@Contract(value = "_, _, _ -> this", mutates = "this")
+	public @NotNull Router registerHandlersConditionally(boolean condition, @NotNull Class<? extends HandlersContainer> handlersClass, @NotNull String prefix) {
+		Checks.notNull(handlersClass, "handlersClass");
+		Checks.notNull(prefix, "prefix");
+		if (!condition)
+			return this;
 		return this.registerHandlers(handlersClass, null, prefix + handlingPrefix(handlersClass));
 	}
 
@@ -151,6 +240,7 @@ public class Router {
 	@Contract(value = "_, _, _ -> this", mutates = "this")
 	private @NotNull Router registerHandlers(@NotNull Class<? extends HandlersContainer> handlersClass, @Nullable HandlersContainer handlersContainer, @NotNull String prefix) {
 		Checks.notNull(handlersClass, "handlersClass");
+		Checks.notNull(prefix, "prefix");
 		for (Method m : handlersClass.getDeclaredMethods()) {
 			if (m.isAnnotationPresent(GetHandler.class) || m.isAnnotationPresent(PostHandler.class) || m.isAnnotationPresent(HttpMethodHandler.class)) {
 				RouteBuilder builder = new RouteBuilder();

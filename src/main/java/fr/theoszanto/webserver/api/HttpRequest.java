@@ -16,6 +16,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Type;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -535,6 +536,16 @@ public final class HttpRequest {
 	@Contract(pure = true)
 	public @Nullable String header(@NotNull String name) {
 		return this.getHeaders().getFirst(name);
+	}
+
+	/**
+	 * Return the client {@link InetSocketAddress}.
+	 *
+	 * @return	The address of the client.
+	 */
+	@Contract(pure = true)
+	public @NotNull InetSocketAddress getClientAddress() {
+		return this.exchange.getRemoteAddress();
 	}
 
 	/**
