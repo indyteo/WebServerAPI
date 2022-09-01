@@ -27,152 +27,152 @@ public class HttpMIMEType {
 	/**
 	 * The list of all existing MIME types.
 	 */
-	private static final @NotNull Set<HttpMIMEType> registry = new HashSet<>();
+	private static final @NotNull Set<@NotNull HttpMIMEType> registry = new HashSet<>();
 
 	/**
 	 * Any kind of binary data.
 	 */
-	public static final HttpMIMEType BIN = new HttpMIMEType("application/octet-stream", "bin", "");
+	public static final @NotNull HttpMIMEType BIN = new HttpMIMEType("application/octet-stream", "bin", "");
 	/**
 	 * Cascading Style Sheets (CSS)
 	 */
-	public static final HttpMIMEType CSS = new HttpMIMEType("text/css", "css");
+	public static final @NotNull HttpMIMEType CSS = new HttpMIMEType("text/css", "css");
 	/**
 	 * Comma-separated values (CSV)
 	 */
-	public static final HttpMIMEType CSV = new HttpMIMEType("text/csv", "csv");
+	public static final @NotNull HttpMIMEType CSV = new HttpMIMEType("text/csv", "csv");
 	/**
 	 * MS Embedded OpenType fonts
 	 */
-	public static final HttpMIMEType EOT = new HttpMIMEType("application/vnd.ms-fontobject", "eot");
+	public static final @NotNull HttpMIMEType EOT = new HttpMIMEType("application/vnd.ms-fontobject", "eot");
 	/**
 	 * Graphics Interchange Format (GIF)
 	 */
-	public static final HttpMIMEType GIF = new HttpMIMEType("image/gif", "gif");
+	public static final @NotNull HttpMIMEType GIF = new HttpMIMEType("image/gif", "gif");
 	/**
 	 * HyperText Markup Language (HTML)
 	 */
-	public static final HttpMIMEType HTML = new HttpMIMEType("text/html", "html", "htm");
+	public static final @NotNull HttpMIMEType HTML = new HttpMIMEType("text/html", "html", "htm");
 	/**
 	 * Icon format
 	 */
-	public static final HttpMIMEType ICO = new HttpMIMEType("image/x-icon", "ico");
+	public static final @NotNull HttpMIMEType ICO = new HttpMIMEType("image/x-icon", "ico");
 	/**
 	 * Java Archive (JAR)
 	 */
-	public static final HttpMIMEType JAR = new HttpMIMEType("application/java-archive", "jar");
+	public static final @NotNull HttpMIMEType JAR = new HttpMIMEType("application/java-archive", "jar");
 	/**
 	 * JPEG images
 	 */
-	public static final HttpMIMEType JPEG = new HttpMIMEType("image/jpeg", "jpeg", "jpg");
+	public static final @NotNull HttpMIMEType JPEG = new HttpMIMEType("image/jpeg", "jpeg", "jpg");
 	/**
 	 * JavaScript (module)
 	 */
-	public static final HttpMIMEType JS = new HttpMIMEType("application/javascript", "js", "mjs");
+	public static final @NotNull HttpMIMEType JS = new HttpMIMEType("application/javascript", "js", "mjs");
 	/**
 	 * JSON format
 	 */
-	public static final HttpMIMEType JSON = new HttpMIMEType("application/json", "json");
+	public static final @NotNull HttpMIMEType JSON = new HttpMIMEType("application/json", "json");
 	/**
 	 * MP3 audio
 	 */
-	public static final HttpMIMEType MP3 = new HttpMIMEType("audio/mpeg", "mp3");
+	public static final @NotNull HttpMIMEType MP3 = new HttpMIMEType("audio/mpeg", "mp3");
 	/**
 	 * MPEG Video
 	 */
-	public static final HttpMIMEType MPEG = new HttpMIMEType("video/mpeg", "mpeg");
+	public static final @NotNull HttpMIMEType MPEG = new HttpMIMEType("video/mpeg", "mpeg");
 	/**
 	 * OGG audio
 	 */
-	public static final HttpMIMEType OGA = new HttpMIMEType("audio/ogg", "oga");
+	public static final @NotNull HttpMIMEType OGA = new HttpMIMEType("audio/ogg", "oga");
 	/**
 	 * OGG video
 	 */
-	public static final HttpMIMEType OGV = new HttpMIMEType("video/ogg", "ogv");
+	public static final @NotNull HttpMIMEType OGV = new HttpMIMEType("video/ogg", "ogv");
 	/**
 	 * OGG
 	 */
-	public static final HttpMIMEType OGG = new HttpMIMEType("application/ogg", "ogg", "ogx");
+	public static final @NotNull HttpMIMEType OGG = new HttpMIMEType("application/ogg", "ogg", "ogx");
 	/**
 	 * Opus audio
 	 */
-	public static final HttpMIMEType OPUS = new HttpMIMEType("audio/opus", "opus");
+	public static final @NotNull HttpMIMEType OPUS = new HttpMIMEType("audio/opus", "opus");
 	/**
 	 * OpenType font
 	 */
-	public static final HttpMIMEType OTF = new HttpMIMEType("font/otf", "otf");
+	public static final @NotNull HttpMIMEType OTF = new HttpMIMEType("font/otf", "otf");
 	/**
 	 * Portable Network Graphics
 	 */
-	public static final HttpMIMEType PNG = new HttpMIMEType("image/png", "png");
+	public static final @NotNull HttpMIMEType PNG = new HttpMIMEType("image/png", "png");
 	/**
 	 * Adobe Portable Document Format (PDF)
 	 */
-	public static final HttpMIMEType PDF = new HttpMIMEType("application/pdf", "pdf");
+	public static final @NotNull HttpMIMEType PDF = new HttpMIMEType("application/pdf", "pdf");
 	/**
 	 * Hypertext Preprocessor (Personal Home Page)
 	 */
-	public static final HttpMIMEType PHP = new HttpMIMEType("application/x-httpd-php", "php");
+	public static final @NotNull HttpMIMEType PHP = new HttpMIMEType("application/x-httpd-php", "php");
 	/**
 	 * RAR archive
 	 */
-	public static final HttpMIMEType RAR = new HttpMIMEType("application/x-rar-compressed", "rar");
+	public static final @NotNull HttpMIMEType RAR = new HttpMIMEType("application/x-rar-compressed", "rar");
 	/**
 	 * Rich Text Format (RTF)
 	 */
-	public static final HttpMIMEType RTF = new HttpMIMEType("application/rtf", "rtf");
+	public static final @NotNull HttpMIMEType RTF = new HttpMIMEType("application/rtf", "rtf");
 	/**
 	 * Scalable Vector Graphics (SVG)
 	 */
-	public static final HttpMIMEType SVG = new HttpMIMEType("image/svg+xml", "svg");
+	public static final @NotNull HttpMIMEType SVG = new HttpMIMEType("image/svg+xml", "svg");
 	/**
 	 * Tape Archive (TAR)
 	 */
-	public static final HttpMIMEType TAR = new HttpMIMEType("application/x-tar", "tar");
+	public static final @NotNull HttpMIMEType TAR = new HttpMIMEType("application/x-tar", "tar");
 	/**
 	 * TypeScript
 	 */
-	public static final HttpMIMEType TS = new HttpMIMEType("application/typescript", "ts");
+	public static final @NotNull HttpMIMEType TS = new HttpMIMEType("application/typescript", "ts");
 	/**
 	 * TrueType Font
 	 */
-	public static final HttpMIMEType TTF = new HttpMIMEType("font/ttf", "ttf");
+	public static final @NotNull HttpMIMEType TTF = new HttpMIMEType("font/ttf", "ttf");
 	/**
 	 * Text
 	 */
-	public static final HttpMIMEType TXT = new HttpMIMEType("text/plain", "txt");
+	public static final @NotNull HttpMIMEType TXT = new HttpMIMEType("text/plain", "txt");
 	/**
 	 * Waveform Audio Format
 	 */
-	public static final HttpMIMEType WAV = new HttpMIMEType("audio/wav", "wav");
+	public static final @NotNull HttpMIMEType WAV = new HttpMIMEType("audio/wav", "wav");
 	/**
 	 * WEBM audio
 	 */
-	public static final HttpMIMEType WEBA = new HttpMIMEType("audio/webm", "weba");
+	public static final @NotNull HttpMIMEType WEBA = new HttpMIMEType("audio/webm", "weba");
 	/**
 	 * WEBM video
 	 */
-	public static final HttpMIMEType WEBM = new HttpMIMEType("video/webm", "webm");
+	public static final @NotNull HttpMIMEType WEBM = new HttpMIMEType("video/webm", "webm");
 	/**
 	 * WEBP image
 	 */
-	public static final HttpMIMEType WEBP = new HttpMIMEType("image/webp", "webp");
+	public static final @NotNull HttpMIMEType WEBP = new HttpMIMEType("image/webp", "webp");
 	/**
 	 * Web Open Font Format (WOFF)
 	 */
-	public static final HttpMIMEType WOFF = new HttpMIMEType("font/woff", "woff");
+	public static final @NotNull HttpMIMEType WOFF = new HttpMIMEType("font/woff", "woff");
 	/**
 	 * Web Open Font Format (WOFF)
 	 */
-	public static final HttpMIMEType WOFF2 = new HttpMIMEType("font/woff2", "woff2");
+	public static final @NotNull HttpMIMEType WOFF2 = new HttpMIMEType("font/woff2", "woff2");
 	/**
 	 * XML
 	 */
-	public static final HttpMIMEType XML = new HttpMIMEType("application/xml", "xml");
+	public static final @NotNull HttpMIMEType XML = new HttpMIMEType("application/xml", "xml");
 	/**
 	 * ZIP archive
 	 */
-	public static final HttpMIMEType ZIP = new HttpMIMEType("application/zipp", "zip");
+	public static final @NotNull HttpMIMEType ZIP = new HttpMIMEType("application/zip", "zip");
 
 	/**
 	 * Default MIME type to BIN format (download needed).
@@ -183,12 +183,12 @@ public class HttpMIMEType {
 	 * manipulating these files, attempting to safeguard
 	 * the user to prevent dangerous behaviors.</p>
 	 */
-	public static final HttpMIMEType DEFAULT = BIN;
+	public static final @NotNull HttpMIMEType DEFAULT = BIN;
 
 	/**
 	 * The extension to associate the MIME string with.
 	 */
-	private final @NotNull Set<String> extentions = new HashSet<>();
+	private final @NotNull Set<@NotNull String> extensions = new HashSet<>();
 
 	/**
 	 * The MIME string associated with the extension.
@@ -201,11 +201,11 @@ public class HttpMIMEType {
 	 * @param mime
 	 * 			The MIME string for this MIME type.
 	 */
-	private HttpMIMEType(@NotNull String mime, @NotNull String... extentions) {
+	private HttpMIMEType(@NotNull String mime, @NotNull String @NotNull... extensions) {
 		Checks.notEmpty(mime, "mime");
-		Checks.notEmpty(extentions, "extentions");
+		Checks.notEmpty(extensions, "extensions");
 		this.mime = mime;
-		this.extentions.addAll(Arrays.asList(extentions));
+		this.extensions.addAll(Arrays.asList(extensions));
 		registry.add(this);
 	}
 
@@ -215,8 +215,8 @@ public class HttpMIMEType {
 	 * @return	The extention that match this MIME type.
 	 */
 	@Contract(pure = true)
-	public @NotNull Set<String> getExtentions() {
-		return this.extentions;
+	public @NotNull Set<@NotNull String> getExtensions() {
+		return this.extensions;
 	}
 
 	/**
@@ -231,22 +231,22 @@ public class HttpMIMEType {
 	}
 
 	/**
-	 * Return the MIME corresponding to the extension {@code extention}.
+	 * Return the MIME corresponding to the extension {@code extension}.
 	 * 
-	 * @param extention
+	 * @param extension
 	 * 			The extension of the file to get the MIME.
 	 * @return	The MIME type corresponding to the extension.
 	 */
 	@Contract(pure = true)
-	public static @Nullable HttpMIMEType fromExtension(@Nullable String extention) {
-		// Check if extentions is default
-		if (extention == null || extention.isEmpty())
+	public static @Nullable HttpMIMEType fromExtension(@Nullable String extension) {
+		// Check if extensions is default
+		if (extension == null || extension.isEmpty())
 			return DEFAULT;
 
-		extention = extention.toLowerCase();
+		extension = extension.toLowerCase();
 		// And the native MIME types
 		for (HttpMIMEType type : registry)
-			if (type.getExtentions().contains(extention))
+			if (type.getExtensions().contains(extension))
 				return type;
 
 		// Finally
@@ -294,18 +294,18 @@ public class HttpMIMEType {
 	 * @param mime
 	 * 			The string MIME, usable in {@code Content-Type}
 	 * 			header.
-	 * @param extentions
+	 * @param extensions
 	 * 			The extensions to MIME is corresponding to.
 	 * @return	The added, or modified if already present, string MIME.
 	 */
-	public static @NotNull HttpMIMEType addMIME(@NotNull String mime, @NotNull String... extentions) {
+	public static @NotNull HttpMIMEType addMIME(@NotNull String mime, @NotNull String @NotNull... extensions) {
 		Checks.notEmpty(mime, "mime");
-		Checks.notEmpty(extentions, "extentions");
+		Checks.notEmpty(extensions, "extensions");
 		HttpMIMEType mimeType = fromMIME(mime);
 		if (mimeType == null)
-			mimeType = new HttpMIMEType(mime, extentions);
+			mimeType = new HttpMIMEType(mime, extensions);
 		else
-			mimeType.extentions.addAll(Arrays.asList(extentions));
+			mimeType.extensions.addAll(Arrays.asList(extensions));
 		return mimeType;
 	}
 
@@ -328,16 +328,16 @@ public class HttpMIMEType {
 	@Override
 	@Contract(pure = true)
 	public int hashCode() {
-		return Objects.hash(mime);
+		return Objects.hash(this.mime);
 	}
 
 	@Override
 	@Contract(pure = true)
-	public boolean equals(Object o) {
+	public boolean equals(@Nullable Object o) {
 		if (this == o) return true;
 		if (o == null || getClass() != o.getClass()) return false;
 		HttpMIMEType that = (HttpMIMEType) o;
-		return mime.equals(that.mime);
+		return this.mime.equals(that.mime);
 	}
 
 	/**
@@ -354,6 +354,6 @@ public class HttpMIMEType {
 	@Override
 	@Contract(value = " -> new", pure = true)
 	public @NotNull String toString() {
-		return this.extentions + ": " + this.mime;
+		return this.extensions + ": " + this.mime;
 	}
 }

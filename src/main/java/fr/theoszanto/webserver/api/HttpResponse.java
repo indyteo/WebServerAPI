@@ -48,8 +48,19 @@ public final class HttpResponse {
 	 */
 	private final @NotNull HttpExchange exchange;
 
+	/**
+	 * The response headers.
+	 *
+	 * @see		HttpResponse#getHeaders()
+	 */
 	private final @NotNull Headers headers;
 
+	/**
+	 * The cookies that will be sent in the response
+	 * as {@code Set-cookie} headers.
+	 *
+	 * @see		HttpResponse#cookie(Cookie)
+	 */
 	private final @NotNull Set<@NotNull Cookie> cookies;
 
 	/**
@@ -105,7 +116,7 @@ public final class HttpResponse {
 	 * @see		HttpResponse#getHeaders()
 	 */
 	@Contract(value = "_, _, _ -> this", mutates = "this")
-	public @NotNull HttpResponse header(@NotNull String name, @NotNull String value, @NotNull String... moreValues) {
+	public @NotNull HttpResponse header(@NotNull String name, @NotNull String value, @NotNull String @NotNull... moreValues) {
 		Checks.notEmpty(name, "name");
 		Checks.notEmpty(value, "value");
 		Checks.notNull(moreValues, "moreValues");
@@ -115,8 +126,18 @@ public final class HttpResponse {
 		return this;
 	}
 
+	/**
+	 * Append the current header with the given value(s).
+	 *
+	 * @param name
+	 * 			The name of the header to append.
+	 * @param values
+	 * 			The values to add to the header.
+	 * @return	Itself, to allow chained calls.
+	 * @see		HttpResponse#getHeaders()
+	 */
 	@Contract(value = "_, _ -> this", mutates = "this")
-	public @NotNull HttpResponse headerAppend(@NotNull String name, @NotNull String... values) {
+	public @NotNull HttpResponse headerAppend(@NotNull String name, @NotNull String @NotNull... values) {
 		Checks.notEmpty(name, "name");
 		Checks.notEmpty(values, "values");
 		for (String value : values)
@@ -328,13 +349,48 @@ public final class HttpResponse {
 		}
 	}
 
+	/**
+	 * End this handling by sending the specified template.
+	 *
+	 * <p>If set, the {@link HttpResponse#status actual status}
+	 * will be send, otherwise a default {@link HttpStatus#OK 200 OK}
+	 * status code is send.</p>
+	 *
+	 * <p>This is a terminal operation.</p>
+	 *
+	 * @param template
+	 * 			The HTML template to send.
+	 * @throws IOException
+	 * 			If an I/O exception occurs, for example, if the
+	 * 			response was already send.
+	 * @see		HtmlTemplate
+	 */
 	@Contract(value = "_ -> fail", mutates = "this")
-	public void sendTemplate(HtmlTemplate template) throws IOException, HandlingEndException {
+	public void sendTemplate(@NotNull HtmlTemplate template) throws IOException, HandlingEndException {
 		this.sendCustom(HttpMIMEType.HTML, template::send);
 	}
 
+	/**
+	 * End the handling by writing the response body using the
+	 * specified {@link ResponseBodyProvider#writeResponseBody(OutputStream)}.
+	 *
+	 * <p>If set, the {@link HttpResponse#status actual status}
+	 * will be send, otherwise a default {@link HttpStatus#OK 200 OK}
+	 * status code is send.</p>
+	 *
+	 * <p>This is a terminal operation.</p>
+	 *
+	 * @param type
+	 * 			The MIME type of the response to send.
+	 * @param bodyProvider
+	 * 			The function to use to write the response body.
+	 * @throws IOException
+	 * 			If an I/O exception occurs, for example, if the
+	 * 			response was already send.
+	 * @see		FileResponse
+	 */
 	@Contract(value = "_, _ -> fail", mutates = "this")
-	public void sendCustom(HttpMIMEType type, @NotNull ResponseBodyProvider bodyProvider) throws IOException, HandlingEndException {
+	public void sendCustom(@NotNull HttpMIMEType type, @NotNull ResponseBodyProvider bodyProvider) throws IOException, HandlingEndException {
 		// Ensure a valid status is set
 		if (this.status == null)
 			this.status = HttpStatus.OK;
@@ -344,7 +400,7 @@ public final class HttpResponse {
 		this.exchange.sendResponseHeaders(this.status.getCode(), 0);
 		// Finally send response body to client
 		try (OutputStream responseBody = this.exchange.getResponseBody()) {
-			bodyProvider.fillOutputStream(responseBody);
+			bodyProvider.writeResponseBody(responseBody);
 			responseBody.flush();
 		}
 		throw new HandlingEndException();
@@ -374,6 +430,13 @@ public final class HttpResponse {
 		this.end();
 	}
 
+	/**
+	 * Trigger the functions before sending the headers.
+	 *
+	 * @throws IOException
+	 * 			If an I/O exception occurs, for example, if the
+	 * 			response was already send.
+	 */
 	private void beforeHeadersSend() throws IOException {
 		for (Cookie cookie : this.cookies)
 			this.headerAppend("Set-cookie", cookie.toString());
@@ -455,6 +518,11 @@ public final class HttpResponse {
 		throw new HandlingEndException();
 	}
 
+	/**
+	 * Retrieve the web server instance.
+	 *
+	 * @return	The instance of the web server.
+	 */
 	public @NotNull WebServer getServer() {
 		return this.server;
 	}

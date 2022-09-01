@@ -47,7 +47,7 @@ public @interface HttpMethodHandler {
 	 * 
 	 * @return	All methods handled by this handler method.
 	 */
-	@NotNull HttpMethod[] methods() default {
+	@NotNull HttpMethod @NotNull[] methods() default {
 			HttpMethod.CONNECT,
 			HttpMethod.DELETE,
 			HttpMethod.GET,
@@ -65,7 +65,7 @@ public @interface HttpMethodHandler {
 	 * @return  {@code true} if the route need to completely
 	 *          match the requested path, {@code false} otherwise.
 	 */
-	boolean strict() default false;
+	boolean strict() default true;
 
 	/**
 	 * Whether the handler is intermediate or not.
@@ -82,6 +82,6 @@ public @interface HttpMethodHandler {
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target(ElementType.METHOD)
 	@interface Repeated {
-		@NotNull HttpMethodHandler[] value();
+		@NotNull HttpMethodHandler @NotNull[] value();
 	}
 }

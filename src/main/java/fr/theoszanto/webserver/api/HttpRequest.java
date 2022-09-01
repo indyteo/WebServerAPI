@@ -109,6 +109,11 @@ public final class HttpRequest {
 	 */
 	private final @NotNull Map<String, String> cookies;
 
+	/**
+	 * The session of the request, if any.
+	 *
+	 * @see		HttpRequest#getSession()
+	 */
 	private @Nullable Session session;
 
 	/**
@@ -189,15 +194,33 @@ public final class HttpRequest {
 		}
 	}
 
+	/**
+	 * Get the context of the request.
+	 *
+	 * @return	The context of the request.
+	 */
+	@Contract(pure = true)
 	public @NotNull RequestContext getContext() {
 		return this.context;
 	}
 
-	void setSession(@NotNull Session session) {
+	/**
+	 * Set the session of the request.
+	 *
+	 * @param session
+	 * 			The request session
+	 */
+	@Contract(mutates = "this")
+	/* package-private */ void setSession(@NotNull Session session) {
 		Checks.notNull(session, "session");
 		this.session = session;
 	}
 
+	/**
+	 * Get the session of the request.
+	 *
+	 * @return	The session of the request.
+	 */
 	@Contract(pure = true)
 	public @NotNull Session getSession() {
 		Checks.notNull(this.session, "session");

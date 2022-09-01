@@ -61,7 +61,7 @@ public class CorsManager implements HandlersContainer {
 	}
 
 	public @NotNull CorsManager allowHeaders(@NotNull String @NotNull... allowedHeaders) {
-		return this.allowOrigins(Arrays.asList(allowedHeaders));
+		return this.allowHeaders(Arrays.asList(allowedHeaders));
 	}
 
 	public @NotNull CorsManager allowHeaders(@NotNull List<@NotNull String> allowedHeaders) {
@@ -96,6 +96,24 @@ public class CorsManager implements HandlersContainer {
 		return this;
 	}
 
+	public @NotNull CorsManager exposeAllHeaders() {
+		this.exposedHeaders = null;
+		return this;
+	}
+
+	public @NotNull CorsManager exposeHeaders(@NotNull String @NotNull... exposedHeaders) {
+		return this.exposeHeaders(Arrays.asList(exposedHeaders));
+	}
+
+	public @NotNull CorsManager exposeHeaders(@NotNull List<@NotNull String> exposedHeaders) {
+		Checks.notEmpty(exposedHeaders, "exposedHeaders");
+		Checks.noneEmpty(exposedHeaders, "exposedHeader");
+		if (this.exposedHeaders == null)
+			this.exposedHeaders = new ArrayList<>();
+		this.exposedHeaders.addAll(exposedHeaders);
+		return this;
+	}
+
 	private @NotNull String bestAllowedOrigin(@Nullable String requestOrigin) {
 		boolean isAcceptingAll = this.allowedOrigins == null;
 		if (requestOrigin == null)
@@ -105,7 +123,7 @@ public class CorsManager implements HandlersContainer {
 		return this.allowedOrigins.get(0);
 	}
 
-	@HttpMethodHandler(intermediate = true)
+	@HttpMethodHandler(intermediate = true, strict = false)
 	private boolean globalCorsHeaders(HttpRequest request, HttpResponse response) {
 		response.header("Vary", "Origin")
 				.header(ALLOW_ORIGIN, this.bestAllowedOrigin(request.getOrigin()))
@@ -113,7 +131,7 @@ public class CorsManager implements HandlersContainer {
 		return true;
 	}
 
-	@HttpMethodHandler(methods = HttpMethod.OPTIONS)
+	@HttpMethodHandler(methods = HttpMethod.OPTIONS, strict = false)
 	private void optionsCorsHeaders(HttpRequest request, HttpResponse response) throws IOException {
 		if (this.allowedOrigins == null) {
 			// Allow every origin

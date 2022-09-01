@@ -54,7 +54,7 @@ public class GlobalHandler implements HandlersContainer {
 	 * @throws IOException
 	 * 			If a I/O exception occurs.
 	 */
-	@HttpMethodHandler
+	@HttpMethodHandler(strict = false)
 	private static void globalHandler(@NotNull HttpRequest request, @NotNull HttpResponse response) throws IOException {
 		LOGGER.fine("Starting handling main route (\"/\")...");
 

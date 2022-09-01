@@ -20,13 +20,13 @@ public class FileResponse {
 	 */
 	private final @NotNull File file;
 	/**
-	 * Whether or not the file should be downloaded by
+	 * Whether the file should be downloaded by
 	 * the client.
 	 */
 	private final boolean download;
 	/**
 	 * Whether to allow unsafe (unknown) file extensions
-	 * to be sent to the client or not.
+	 * to be sent to the client.
 	 */
 	private final boolean unsafe;
 	/**
@@ -59,24 +59,42 @@ public class FileResponse {
 		this.type = type;
 	}
 
+	/**
+	 * Get the file in this response.
+	 * @return The file to send to the client
+	 */
 	public @NotNull File getFile() {
 		return this.file;
 	}
 
+	/**
+	 * Get if the response should indicate to download the file or not.
+	 * @return Whether the file should be downloaded by the client
+	 */
 	public boolean isDownload() {
 		return this.download;
 	}
 
+	/**
+	 * Get if the response should be allowed even if the file's MIME type is unknown.
+	 * @return Whether to allow unsafe (unknown) file extensions to be sent to the client
+	 */
 	public boolean isUnsafe() {
 		return this.unsafe;
 	}
 
+	/**
+	 * Get the MIME type that will be sent in the response.
+	 * If {@code null}, it will be {@link HttpMIMEType#fromExtension(File)
+	 * retrieved from the file's extension}.
+	 * @return The MIME type to respond with
+	 */
 	public @Nullable HttpMIMEType getType() {
 		return this.type;
 	}
 
 	/**
-	 * Builder to create {@link FileResponse file response}
+	 * Builder to create {@link FileResponse file response}.
 	 */
 	public static class Builder {
 		/**

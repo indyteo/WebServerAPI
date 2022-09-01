@@ -41,7 +41,7 @@ public @interface PostHandler {
 	 * @return  {@code true} if the route need to completely
 	 *          match the requested path, {@code false} otherwise.
 	 */
-	boolean strict() default false;
+	boolean strict() default true;
 
 	/**
 	 * Whether the handler is intermediate or not.
@@ -58,6 +58,6 @@ public @interface PostHandler {
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target(ElementType.METHOD)
 	@interface Repeated {
-		@NotNull PostHandler[] value();
+		@NotNull PostHandler @NotNull[] value();
 	}
 }

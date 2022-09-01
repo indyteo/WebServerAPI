@@ -86,6 +86,8 @@ public class WebServer {
 	 * 			The root of the server.
 	 * @param sessionsDir
 	 * 			The root directory of the clients sessions.
+	 * @throws WebServerException
+	 * 			If the server fails to start.
 	 */
 	public WebServer(int port, @NotNull String root, @NotNull String sessionsDir) throws WebServerException {
 		Checks.notNull(root, "root");
@@ -131,7 +133,7 @@ public class WebServer {
 			LOGGER.info("Server started!");
 		} catch (IOException e) {
 			LOGGER.log(Level.SEVERE, "Unable to start server.", e);
-			throw new WebServerException("A fatal error occured while starting server.", e);
+			throw new WebServerException("A fatal error occurred while starting server.", e);
 		}
 	}
 
@@ -215,9 +217,12 @@ public class WebServer {
 	 * @param templates
 	 * 			The templates to load.
 	 * @return	Itself, to allow chained calls.
+	 * @throws WebServerException
+	 * 			If a template is not found.
+	 * @see		HtmlTemplate#loadTemplates(WebServer, String...)
 	 */
 	@Contract(value = "_ -> this", mutates = "this")
-	public WebServer loadTemplates(String... templates) {
+	public WebServer loadTemplates(@NotNull String @NotNull... templates) throws WebServerException {
 		HtmlTemplate.loadTemplates(this, templates);
 		return this;
 	}
@@ -228,10 +233,12 @@ public class WebServer {
 	 * @param clazz
 	 * 			The class containing templates fields to load.
 	 * @return	Itself, to allow chained calls.
+	 * @throws WebServerException
+	 * 			If a template is not found or the field is invalid.
 	 * @see		fr.theoszanto.webserver.api.FileTemplate @FileTemplate
 	 */
 	@Contract(value = "_ -> this", mutates = "this")
-	public WebServer loadTemplates(Class<?> clazz) {
+	public WebServer loadTemplates(@NotNull Class<?> clazz) throws WebServerException {
 		HtmlTemplate.loadTemplates(this, clazz);
 		return this;
 	}
@@ -323,7 +330,7 @@ public class WebServer {
 	 *  Log server informations using the given {@link Level level}.
 	 *
 	 * @param level
-	 * 			The Level used to log informations.
+	 * 			The Level used to log information.
 	 */
 	public void logDebugInfo(@NotNull Level level) {
 		Checks.notNull(level, "level");
