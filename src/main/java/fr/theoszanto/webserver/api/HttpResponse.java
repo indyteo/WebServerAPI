@@ -394,8 +394,9 @@ public final class HttpResponse {
 		// Ensure a valid status is set
 		if (this.status == null)
 			this.status = HttpStatus.OK;
-		// Then, set the Content-type header
+		// Then, set the Content-type header & other headers
 		this.contentType(type);
+		this.beforeHeadersSend();
 		// Send headers in response to client
 		this.exchange.sendResponseHeaders(this.status.getCode(), 0);
 		// Finally send response body to client
